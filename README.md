@@ -1,7 +1,8 @@
 # FlatSQL Studio
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Runs on Windows](https://img.shields.io/badge/Windows-blue)
+
+![Runs on Windows](https://img.shields.io/badge/runs%20on%20-Windows-blue)
 
 FlatSQL Studio is a desktop SQL client for querying flat files and cloud-backed storage directly with DuckDB. It is designed for fast local analytics workflows without spinning up a database server.
 
