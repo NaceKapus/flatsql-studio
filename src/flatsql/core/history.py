@@ -74,8 +74,8 @@ class HistoryManager:
             FROM flatsql.query_history 
             ORDER BY timestamp DESC, rowid DESC
             LIMIT {limit}
-        """).fetchdf()
-        return df.to_dict("records")
+        """).pl()
+        return df.to_dicts()
 
     def enforce_retention_limit(self, limit: int) -> None:
         """Deletes older queries exceeding the retention limit."""

@@ -17,7 +17,7 @@ DEFAULT_SETTINGS = {
     'snippets_visible': False,
     'file_explorer_side': 'left',
     'db_explorer_side': 'left',
-    'snippets_side': 'left',
+    'snippets_side': 'right',
     'theme': 'dark.json',
     'run_query_shortcut': 'Ctrl+Return',
     'sql_autocomplete_enabled': True,

@@ -28,10 +28,6 @@ from flatsql.ui.panels.snippet_panel import SnippetPanel
 
 os.environ['QT_API'] = 'pyside6'
 
-if sys.platform == 'win32':
-    import ctypes
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('sqlfans.flatsql.1.0')
-
 class MainWindow(QMainWindow):
     """Primary application window that composes all panels and controllers."""
 
