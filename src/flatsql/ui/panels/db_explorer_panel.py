@@ -50,6 +50,8 @@ class DBExplorerPanel(QFrame):
         self.theme_manager = theme_manager
         self.connections = connections
         self._active_filter_query = ""
+        self._search_preload_done = False
+        self._pre_search_expanded_keys: set[tuple[str, ...]] | None = None
         self._filter_timer = QTimer(self)
         self._filter_timer.setSingleShot(True)
         self._filter_timer.setInterval(120)
@@ -116,11 +118,82 @@ class DBExplorerPanel(QFrame):
 
     def _apply_filter_from_input(self) -> None:
         """Apply the current search text to loaded database tree nodes."""
+        previous_query = self._active_filter_query
         query = self.filter_input.text().strip().lower()
         if query == self._active_filter_query:
             return
+
+        if query and not previous_query:
+            self._pre_search_expanded_keys = self._capture_expanded_state()
+
         self._active_filter_query = query
+
+        if query:
+            if not self._search_preload_done:
+                self._preload_lazy_search_nodes(node_budget=160)
+                self._search_preload_done = True
+        else:
+            self._search_preload_done = False
+
         self._apply_filter()
+
+        if not query and previous_query and self._pre_search_expanded_keys is not None:
+            self._restore_expanded_state_exact(self._pre_search_expanded_keys)
+            self._pre_search_expanded_keys = None
+
+    def _restore_expanded_state_exact(self, expanded_keys: set[tuple[str, ...]]) -> None:
+        """Restore expansion to an exact previous state by collapsing extras first."""
+        for item in self._iter_items():
+            index: QModelIndex = self.db_model.indexFromItem(item)
+            if index.isValid() and self.db_tree.isExpanded(index):
+                self.db_tree.setExpanded(index, False)
+        self._restore_expanded_state(expanded_keys)
+
+    @staticmethod
+    def _has_placeholder_child(item: QStandardItem) -> bool:
+        """Return whether an item still has an unresolved lazy-load placeholder."""
+        return item.rowCount() > 0 and (item.child(0).text() or "") == ""
+
+    @staticmethod
+    def _normalized_item_text(item: QStandardItem) -> str | None:
+        """Return item text without transient suffix, or None for deleted wrappers."""
+        try:
+            return (item.text() or "").replace(" (expanding...)", "")
+        except RuntimeError:
+            # Qt may delete wrappers when lazy expansion mutates model rows.
+            return None
+
+    def _preload_lazy_search_nodes(self, node_budget: int) -> None:
+        """Load a bounded set of lazy nodes so search works before manual expansion.
+
+        Columns and constraints are loaded on-demand. Without this pass, initial
+        filtering cannot match column/constraint names until users expand folders.
+
+        Args:
+            node_budget: Maximum number of lazy nodes to expand during preload.
+        """
+        processed = 0
+        while processed < node_budget:
+            expanded_in_pass = False
+            for item in self._iter_items():
+                cleaned_text = self._normalized_item_text(item)
+                if cleaned_text not in {"Columns", "Constraints"}:
+                    continue
+                if not self._has_placeholder_child(item):
+                    continue
+
+                index: QModelIndex = self.db_model.indexFromItem(item)
+                if not index.isValid():
+                    continue
+
+                self._on_item_expanded(index)
+                processed += 1
+                expanded_in_pass = True
+                # Lazy expansion mutates model rows; restart from a fresh snapshot.
+                break
+
+            if not expanded_in_pass:
+                break
 
     def _item_matches_filter(self, item: QStandardItem, query: str) -> bool:
         """Return whether this item matches the active filter query."""
@@ -150,7 +223,7 @@ class DBExplorerPanel(QFrame):
         is_visible = (not query) or self_match or descendant_match
         self._set_item_hidden(item, not is_visible)
 
-        if query and descendant_match:
+        if query and len(query) >= 2 and descendant_match:
             index = self.db_model.indexFromItem(item)
             if index.isValid():
                 self.db_tree.setExpanded(index, True)
@@ -251,6 +324,8 @@ class DBExplorerPanel(QFrame):
         expanded_keys = self._capture_expanded_state() if preserve_expansion else set()
         selected_key = self.connection_combo.currentData()
         self.db_model.clear()
+        self._search_preload_done = False
+        self._pre_search_expanded_keys = None
         self.connection_combo.blockSignals(True)
         self.connection_combo.clear()
 
@@ -280,6 +355,8 @@ class DBExplorerPanel(QFrame):
             # Tables Node
             tables_node = QStandardItem(folder_icon, "Tables")
             tables_node.setEditable(False)
+            tables_node.setData("group", Qt.UserRole + 1)
+            tables_node.setData(key, Qt.UserRole + 2)
             db_root_item.appendRow(tables_node)
             for schema, table_name in sorted(db_objects.get("tables", [])):
                 item = QStandardItem(table_icon, f"{schema}.{table_name}")
@@ -289,11 +366,15 @@ class DBExplorerPanel(QFrame):
 
                 columns_node = QStandardItem(folder_icon, "Columns")
                 columns_node.setEditable(False)
+                columns_node.setData("columns", Qt.UserRole + 1)
+                columns_node.setData(key, Qt.UserRole + 2)
                 columns_node.appendRow(QStandardItem())
                 item.appendRow(columns_node)
 
                 constraints_node = QStandardItem(folder_icon, "Constraints")
                 constraints_node.setEditable(False)
+                constraints_node.setData("constraints", Qt.UserRole + 1)
+                constraints_node.setData(key, Qt.UserRole + 2)
                 constraints_node.appendRow(QStandardItem())
                 item.appendRow(constraints_node)
 
@@ -302,6 +383,8 @@ class DBExplorerPanel(QFrame):
             # Views Node
             views_node = QStandardItem(folder_icon, "Views")
             views_node.setEditable(False)
+            views_node.setData("group", Qt.UserRole + 1)
+            views_node.setData(key, Qt.UserRole + 2)
             db_root_item.appendRow(views_node)
             for schema, view_name in sorted(db_objects.get("views", [])):
                 item = QStandardItem(view_icon, f"{schema}.{view_name}")
@@ -311,6 +394,8 @@ class DBExplorerPanel(QFrame):
 
                 columns_node = QStandardItem(folder_icon, "Columns")
                 columns_node.setEditable(False)
+                columns_node.setData("columns", Qt.UserRole + 1)
+                columns_node.setData(key, Qt.UserRole + 2)
                 columns_node.appendRow(QStandardItem())
                 item.appendRow(columns_node)
                 views_node.appendRow(item)
@@ -320,14 +405,19 @@ class DBExplorerPanel(QFrame):
             if system_views_list:
                 system_views_node = QStandardItem(folder_icon, "System Views")
                 system_views_node.setEditable(False)
+                system_views_node.setData("group", Qt.UserRole + 1)
+                system_views_node.setData(key, Qt.UserRole + 2)
                 views_node.appendRow(system_views_node)
                 for schema, view_name in sorted(system_views_list):
                     item = QStandardItem(view_icon, f"{schema}.{view_name}")
+                    item.setEditable(False)
                     item.setData("db_object", Qt.UserRole + 1)
                     item.setData(key, Qt.UserRole + 2)
                     
                     columns_node = QStandardItem(folder_icon, "Columns")
                     columns_node.setEditable(False)
+                    columns_node.setData("columns", Qt.UserRole + 1)
+                    columns_node.setData(key, Qt.UserRole + 2)
                     columns_node.appendRow(QStandardItem())
                     item.appendRow(columns_node)
                     system_views_node.appendRow(item)
@@ -337,6 +427,8 @@ class DBExplorerPanel(QFrame):
             if functions_list:
                 functions_node = QStandardItem(folder_icon, "Functions")
                 functions_node.setEditable(False)
+                functions_node.setData("group", Qt.UserRole + 1)
+                functions_node.setData(key, Qt.UserRole + 2)
                 db_root_item.appendRow(functions_node)
                 for func_name, func_type in functions_list:
                     f_item = QStandardItem(func_icon, func_name)

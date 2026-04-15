@@ -1,1 +1,1 @@
-"""FlatSQL test suite."""
+"""FlatSQL Studio test suite."""

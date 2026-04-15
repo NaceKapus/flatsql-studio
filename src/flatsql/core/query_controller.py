@@ -1,4 +1,4 @@
-"""Background query orchestration for FlatSQL."""
+"""Background query orchestration for FlatSQL Studio."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Qt item models used by FlatSQL UI components."""
+"""Qt item models used by FlatSQL Studio UI components."""
 
 from __future__ import annotations
 

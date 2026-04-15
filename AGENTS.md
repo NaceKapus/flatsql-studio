@@ -1,10 +1,10 @@
-# Project Context: FlatSQL
+# Project Context: FlatSQL Studio
 
 ## Role
-You are an expert Python, PySide6, and DuckDB developer. Your task is to maintain and extend FlatSQL, an open-source desktop SQL client.
+You are an expert Python, PySide6, and DuckDB developer. Your task is to maintain and extend FlatSQL Studio, an open-source desktop SQL client.
 
 ## Overview
-FlatSQL queries flat files (CSV, Parquet, JSON, Excel) and cloud storage (Azure, Databricks) directly using DuckDB. 
+FlatSQL Studio queries flat files (CSV, Parquet, JSON, Excel, etc.) and cloud storage (Azure, Databricks) directly using DuckDB.
 
 ## Tech Stack
 - **GUI Framework:** PySide6 (Qt for Python)

@@ -225,14 +225,14 @@ class MainMenuBar(QMenuBar):
                 editor.redo()
 
     def _open_documentation(self) -> None:
-        """Open the FlatSQL documentation in the default browser."""
+        """Open the FlatSQL Studio documentation in the default browser."""
         QDesktopServices.openUrl(QUrl(DOCS_URL))
 
     def _show_about_dialog(self) -> None:
-        """Display the About dialog for FlatSQL."""
-        QMessageBox.about(self.mw, "About FlatSQL", f"""
-    <p><b>FlatSQL - Version {APP_VERSION}</b></p>
-    <p>FlatSQL is an open-source desktop SQL client designed to make querying flat files and cloud storage as simple as querying a traditional database.</p>
+        """Display the About dialog for FlatSQL Studio."""
+        QMessageBox.about(self.mw, "About FlatSQL Studio", f"""
+    <p><b>FlatSQL Studio - Version {APP_VERSION}</b></p>
+    <p>FlatSQL Studio is an open-source desktop SQL client designed to make querying flat files and cloud storage as simple as querying a traditional database.</p>
     <p>Powered by DuckDB and Polars, it allows you to write standard SQL directly against local and remote data formats (CSV, TSV, PSV, Parquet, JSON, JSON Lines, text, Excel) without any ingestion steps.</p>
-    <p>Built for data engineers and analysts, FlatSQL streamlines your workflow with native cloud connectivity, automated schema inference, and built-in data profiling tools.</p>
+    <p>Built for data engineers and analysts, FlatSQL Studio streamlines your workflow with native cloud connectivity, automated schema inference, and built-in data profiling tools.</p>
         """)

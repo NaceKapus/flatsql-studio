@@ -1,4 +1,4 @@
-"""Connection lifecycle management for FlatSQL."""
+"""Connection lifecycle management for FlatSQL Studio."""
 
 from __future__ import annotations
 
@@ -12,6 +12,18 @@ from flatsql.core.engine import FlatEngine
 from flatsql.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+_DATABRICKS_KEYRING_SERVICE = "FlatSQLStudio_Databricks"
+_LEGACY_DATABRICKS_KEYRING_SERVICE = "FlatSQL_Databricks"
+
+
+def _get_saved_databricks_token(endpoint: str) -> str | None:
+    """Return a saved Databricks token from current or legacy keyring keys."""
+    for service_name in (_DATABRICKS_KEYRING_SERVICE, _LEGACY_DATABRICKS_KEYRING_SERVICE):
+        token = keyring.get_password(service_name, endpoint)
+        if token:
+            return token
+    return None
 
 class ConnectionManager(QObject):
     """Manage database and file-system connections used throughout the app."""
@@ -80,7 +92,7 @@ class ConnectionManager(QObject):
         for conn_key, config in db_conns.items():
             endpoint = config['endpoint']
             catalog = config['catalog']
-            token = keyring.get_password("FlatSQL_Databricks", endpoint)
+            token = _get_saved_databricks_token(endpoint)
 
             if not token:
                 logger.warning("Could not restore Databricks catalog %s because the token is missing.", catalog)
@@ -134,7 +146,7 @@ class ConnectionManager(QObject):
         self.db_connections[conn_key] = engine
 
         try:
-            keyring.set_password("FlatSQL_Databricks", endpoint, token)
+            keyring.set_password(_DATABRICKS_KEYRING_SERVICE, endpoint, token)
         except Exception:
             logger.exception("Failed to save Databricks token for %s to the OS keyring.", endpoint)
 

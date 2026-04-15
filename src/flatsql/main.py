@@ -1,4 +1,4 @@
-"""Main window composition and lifecycle wiring for FlatSQL."""
+"""Main window composition and lifecycle wiring for FlatSQL Studio."""
 
 from __future__ import annotations
 
@@ -28,10 +28,6 @@ from flatsql.ui.panels.snippet_panel import SnippetPanel
 
 os.environ['QT_API'] = 'pyside6'
 
-if sys.platform == 'win32':
-    import ctypes
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('sqlfans.flatsql.1.0')
-
 class MainWindow(QMainWindow):
     """Primary application window that composes all panels and controllers."""
 
@@ -56,7 +52,7 @@ class MainWindow(QMainWindow):
 
     def setup_ui(self) -> None:
         """Build the full main window UI and connect application signals."""
-        self.setWindowTitle(f"FlatSQL {APP_VERSION}")
+        self.setWindowTitle(f"FlatSQL Studio {APP_VERSION}")
         
         icon_path = os.path.join(ASSETS_DIR, 'img', 'icon.ico')
         if os.path.exists(icon_path):

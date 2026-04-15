@@ -1,6 +1,6 @@
 ﻿{
     "name": "Mint",
-    "description": "Light theme derived from FlatSQL Light with a mint accent.",
+    "description": "Light theme derived from FlatSQL Studio Light with a mint accent.",
     "sort_order": 7,
     "palette": {
         "Window": "#F3F4F6",

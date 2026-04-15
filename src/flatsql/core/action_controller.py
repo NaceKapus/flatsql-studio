@@ -608,7 +608,7 @@ class ActionController:
         self.profiler_dialog.show()
 
     def open_logs(self) -> None:
-        """Open the FlatSQL log file in the default text editor."""
+        """Open the FlatSQL Studio log file in the default text editor."""
         log_path = os.path.join(BASE_DIR, "flatsql.log")
         if os.path.exists(log_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(log_path))
