@@ -1,16 +1,9 @@
 # FlatSQL Studio
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Runs on Windows](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows-blue)
+![Runs on Windows](https://img.shields.io/badge/Windows-blue)
 
 FlatSQL Studio is a desktop SQL client for querying flat files and cloud-backed storage directly with DuckDB. It is designed for fast local analytics workflows without spinning up a database server.
-
-## Why FlatSQL Studio
-
-- Query CSV, TSV, PSV, Parquet, JSON, JSON Lines, text, and Excel with SQL in seconds.
-- Explore schemas, generate helper SQL, and inspect results in a responsive desktop UI.
-- Export query outputs to common formats for downstream workflows.
-- Keep everything local-first while still supporting cloud connection scenarios.
 
 ## Key Features
 
@@ -20,7 +13,7 @@ FlatSQL Studio is a desktop SQL client for querying flat files and cloud-backed 
 - Results grid, messages panel, and profiling/visualization tools.
 - Theme support with multiple bundled themes.
 - Export to CSV, Parquet, JSON, and Excel.
-- Azure and Databricks related connectivity flows.
+- Ability to mount external file systems (for example Azure) and databases (for example DuckDB and Databricks).
 
 ## Tech Stack
 
@@ -74,6 +67,14 @@ python run.py
 4. Review results in the grid and messages tabs.
 5. Save useful queries as snippets for reuse.
 
+## Verify
+
+Run tests:
+
+```bash
+pytest
+```
+
 ## Architecture
 
 FlatSQL Studio follows a layered architecture:
@@ -82,21 +83,11 @@ FlatSQL Studio follows a layered architecture:
 - ui: panels, dialogs, models, and custom widgets.
 - main window: composition and signal wiring between UI and controllers.
 
-See ARCHITECTURE.md for a full walkthrough.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a full walkthrough.
 
 ## Development
 
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the app:
-
-```bash
-python run.py
-```
+For contributor setup, workflow, and expectations, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
@@ -106,9 +97,12 @@ Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for the
 
 FlatSQL Studio is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
-## Roadmap Ideas
+## Roadmap
 
 - Additional connectors (AWS, GCP, and more).
 - Built-in Delta support.
 - Additional database explorer functionality.
+- Flat file pivot tables.
+- Data and schema compare tools.
+- Advanced snippet functionalities (for example parameters).
 
