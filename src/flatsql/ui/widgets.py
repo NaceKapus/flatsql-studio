@@ -36,7 +36,7 @@ class DownwardComboBox(QComboBox):
     DEFAULT_WIDTH = 204
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        """Initialize the combobox with the standard FlatSQL sizing behavior."""
+        """Initialize the combobox with the standard FlatSQL Studio sizing behavior."""
         super().__init__(parent)
         self.setMinimumWidth(self.DEFAULT_WIDTH)
         self.setMaximumWidth(self.DEFAULT_WIDTH)

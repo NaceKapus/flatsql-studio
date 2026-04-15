@@ -59,6 +59,8 @@ class FileExplorerPanel(QFrame):
         self.get_active_engine_func = get_active_engine_func
         self.icon_provider = QFileIconProvider()
         self._active_filter_query = ""
+        self._search_preload_level = 0
+        self._pre_search_expanded_keys: set[tuple[str, str, str, str]] | None = None
         self._filter_timer = QTimer(self)
         self._filter_timer.setSingleShot(True)
         self._filter_timer.setInterval(120)
@@ -110,11 +112,134 @@ class FileExplorerPanel(QFrame):
 
     def _apply_filter_from_input(self) -> None:
         """Apply the current search text to the loaded tree contents."""
+        previous_query = self._active_filter_query
         query = self.filter_input.text().strip().lower()
         if query == self._active_filter_query:
             return
+
+        if query and not previous_query:
+            self._pre_search_expanded_keys = self._capture_expanded_state()
+
         self._active_filter_query = query
+
+        if query:
+            required_level, max_depth, node_budget = self._get_preload_params_for_query(query)
+            if required_level > self._search_preload_level:
+                self._preload_search_nodes(max_depth=max_depth, node_budget=node_budget)
+                self._search_preload_level = required_level
+        else:
+            self._search_preload_level = 0
+
         self._apply_filter()
+
+        if not query and previous_query and self._pre_search_expanded_keys is not None:
+            self._restore_expanded_state_exact(self._pre_search_expanded_keys)
+            self._pre_search_expanded_keys = None
+
+    @staticmethod
+    def _get_preload_params_for_query(query: str) -> tuple[int, int, int]:
+        """Return progressive preload settings for a given search query.
+
+        Returns:
+            A tuple of (preload_level, max_depth, node_budget).
+        """
+        query_len = len(query)
+        if query_len <= 1:
+            return (1, 2, 120)
+        if query_len <= 2:
+            return (2, 4, 600)
+        return (3, 8, 3500)
+
+    def _restore_expanded_state_exact(self, expanded_keys: set[tuple[str, str, str, str]]) -> None:
+        """Restore expansion to an exact previous state by collapsing extras first."""
+        for item in self._iter_items():
+            index: QModelIndex = self.file_model.indexFromItem(item)
+            if index.isValid() and self.file_tree.isExpanded(index):
+                self.file_tree.setExpanded(index, False)
+        self._restore_expanded_state(expanded_keys)
+
+    @staticmethod
+    def _has_placeholder_child(item: QStandardItem) -> bool:
+        """Return whether an item still has an unresolved lazy-load placeholder."""
+        return item.rowCount() > 0 and (item.child(0).text() or "") == ""
+
+    @staticmethod
+    def _is_in_favorites_branch(item: QStandardItem) -> bool:
+        """Return whether an item is inside the Favorites subtree."""
+        current: QStandardItem | None = item
+        while current is not None:
+            if str(current.data(Qt.UserRole + 2) or "") == "favorites_root":
+                return True
+            current = current.parent()
+        return False
+
+    def _find_next_preload_candidate(
+        self,
+        max_depth: int,
+        favorites_only: bool,
+    ) -> QModelIndex:
+        """Find one currently valid lazy-load candidate for search preload.
+
+        Args:
+            max_depth: Maximum depth from root to consider for preload.
+            favorites_only: Whether to only consider items under Favorites.
+
+        Returns:
+            Model index for the next candidate, or an invalid index if none found.
+        """
+        root = self.file_model.invisibleRootItem()
+        stack: list[tuple[QStandardItem, int]] = [
+            (root.child(row), 0) for row in range(root.rowCount()) if root.child(row)
+        ]
+
+        while stack:
+            item, depth = stack.pop()
+            if item is None:
+                continue
+
+            is_favorite_branch = self._is_in_favorites_branch(item)
+            if favorites_only and not is_favorite_branch:
+                for row in range(item.rowCount()):
+                    child = item.child(row)
+                    if child is not None:
+                        stack.append((child, depth + 1))
+                continue
+
+            item_type = str(item.data(Qt.UserRole + 2) or "")
+            if depth < max_depth and item_type in {"connection", "directory"} and self._has_placeholder_child(item):
+                index: QModelIndex = self.file_model.indexFromItem(item)
+                if index.isValid():
+                    return index
+
+            for row in range(item.rowCount()):
+                child = item.child(row)
+                if child is not None:
+                    stack.append((child, depth + 1))
+
+        return QModelIndex()
+
+    def _preload_search_nodes(self, max_depth: int, node_budget: int) -> None:
+        """Materialize a bounded portion of lazy nodes so first search finds results.
+
+        The explorer is lazily populated, so filtering before expansion can only
+        inspect placeholder nodes. This preloads a limited subtree on the first
+        non-empty query to improve discoverability without fully crawling sources.
+
+        Args:
+            max_depth: Maximum depth from root to preload.
+            node_budget: Maximum number of nodes to process per preload pass.
+        """
+        processed = 0
+
+        while processed < node_budget:
+            index = self._find_next_preload_candidate(max_depth=max_depth, favorites_only=True)
+            if not index.isValid():
+                index = self._find_next_preload_candidate(max_depth=max_depth, favorites_only=False)
+            if not index.isValid():
+                break
+
+            self._on_item_expanded(index, show_warning=False)
+            processed += 1
 
     def _item_matches_filter(self, item: QStandardItem, query: str) -> bool:
         """Return whether this item matches the current filter query."""
@@ -144,7 +269,7 @@ class FileExplorerPanel(QFrame):
         is_visible = (not query) or self_match or descendant_match
         self._set_item_hidden(item, not is_visible)
 
-        if query and descendant_match:
+        if query and len(query) >= 2 and descendant_match:
             index = self.file_model.indexFromItem(item)
             if index.isValid():
                 self.file_tree.setExpanded(index, True)
@@ -239,6 +364,8 @@ class FileExplorerPanel(QFrame):
         """
         expanded_keys = self._capture_expanded_state() if preserve_expansion else set()
         self.file_model.clear()
+        self._search_preload_level = 0
+        self._pre_search_expanded_keys = None
         icon_color = self.theme_colors.get('icon', '#6C757D')
 
         fav_icon = qta.icon('fa5s.star', color='goldenrod')
@@ -327,11 +454,12 @@ class FileExplorerPanel(QFrame):
         if is_expanded:
             self.file_tree.setExpanded(index, True)
 
-    def _on_item_expanded(self, index: Any) -> None:
+    def _on_item_expanded(self, index: Any, show_warning: bool = True) -> None:
         """Populate tree items when node is expanded.
         
         Args:
             index: The model index of expanded node.
+            show_warning: Whether to show warning dialogs for missing prerequisites.
         """
         item = self.file_model.itemFromIndex(index)
         if not item or (item.rowCount() > 0 and item.child(0).text()):
@@ -361,7 +489,8 @@ class FileExplorerPanel(QFrame):
 
             engine = self.get_active_engine_func()
             if not engine:
-                QMessageBox.warning(self, "No Connection", "A database connection is required to browse files.")
+                if show_warning:
+                    QMessageBox.warning(self, "No Connection", "A database connection is required to browse files.")
                 return
 
             files = connector.list_files(engine, path_to_list)
@@ -390,6 +519,8 @@ class FileExplorerPanel(QFrame):
                 if file_type == 'directory':
                     child_item.appendRow(QStandardItem())
                 child_item.setEditable(False)
+                child_item.setData(conn_name, Qt.UserRole + 1)
+                child_item.setData(file_type, Qt.UserRole + 2)
                 child_item.setData(full_path, Qt.UserRole + 3)
                 converted_path = self._convert_to_abfs_path(full_path)
                 child_item.setData(converted_path, Qt.UserRole + 4)

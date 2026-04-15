@@ -14,7 +14,7 @@ from flatsql.main import MainWindow
 
 
 def main() -> int:
-    """Run the FlatSQL desktop application."""
+    """Run the FlatSQL Studio desktop application."""
     configure_startup_display()
     app = QApplication(sys.argv)
 

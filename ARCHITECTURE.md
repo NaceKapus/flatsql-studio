@@ -1,8 +1,8 @@
-# FlatSQL Architecture Guide
+# FlatSQL Studio Architecture Guide
 
 ## Overview
 
-FlatSQL is a desktop SQL client for querying flat files (CSV, Parquet, JSON, Excel) and cloud storage (Azure, Databricks) directly using DuckDB. The application is built on:
+FlatSQL Studio is a desktop SQL client for querying flat files (CSV, Parquet, JSON, Excel) and cloud storage (Azure, Databricks) directly using DuckDB. The application is built on:
 
 - **GUI Framework:** PySide6 (Qt for Python)
 - **Database Engine:** DuckDB
@@ -10,7 +10,7 @@ FlatSQL is a desktop SQL client for querying flat files (CSV, Parquet, JSON, Exc
 - **Styling:** QSS + JSON theming system
 - **Threading:** PySide6 QThread for async operations
 
-This guide explains the architecture, design decisions, and how to extend FlatSQL.
+This guide explains the architecture, design decisions, and how to extend FlatSQL Studio.
 
 ---
 
@@ -352,8 +352,8 @@ self.query_panel.run_query_requested.connect(
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/FlatSQL.git
-   cd FlatSQL
+  git clone https://github.com/yourusername/flatsql-studio.git
+  cd flatsql-studio
    ```
 
 2. **Create virtual environment:**
@@ -367,7 +367,7 @@ self.query_panel.run_query_requested.connect(
    pip install -r requirements.txt
    ```
 
-4. **Run FlatSQL:**
+4. **Run FlatSQL Studio:**
    ```bash
    python run.py
    ```
@@ -489,7 +489,7 @@ logger.warning("Potential issue", exc_info=e)
 A: Create a `QThread` worker with signals. Never block the main thread.
 
 **Q: Can I use pandas instead of polars?**  
-A: No. FlatSQL is committed to Polars for performance. Pandas is slow on large datasets.
+A: No. FlatSQL Studio is committed to Polars for performance. Pandas is slow on large datasets.
 
 ---
 
