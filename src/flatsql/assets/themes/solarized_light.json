@@ -1,0 +1,256 @@
+﻿{
+    "name": "Solarized Light",
+    "description": "Precision warm beige theme designed to reduce eye strain.",
+    "sort_order": 11,
+    "palette": {
+        "Window": "#EEE8D5",
+        "WindowText": "#586E75",
+        "Base": "#FDF6E3",
+        "AlternateBase": "#EEE8D5",
+        "Text": "#586E75",
+        "PlaceholderText": "#93A1A1",
+        "Button": "#E6DFCB",
+        "ButtonText": "#586E75",
+        "Highlight": "#D5CCBA",
+        "HighlightedText": "#073642",
+        "Disabled": {
+            "Text": "#93A1A1",
+            "ButtonText": "#93A1A1"
+        }
+    },
+    "stylesheet": {
+        "QFrame#file_explorer_frame, QFrame#db_explorer_frame, QFrame#snippet_frame": {
+            "background-color": "#EEE8D5",
+            "border-right": "1px solid #D5CCBA"
+        },
+        "QFrame#query_frame": {
+            "background-color": "#FDF6E3"
+        },
+        "QFrame#results_frame": {
+            "background-color": "#FDF6E3"
+        },
+        "QScrollBar:vertical": {
+            "background": "#EEE8D5"
+        },
+        "QScrollBar::handle:vertical": {
+            "background": "#D5CCBA"
+        },
+        "QScrollBar::handle:vertical:hover": {
+            "background": "#93A1A1"
+        },
+        "QScrollBar:horizontal": {
+            "background": "#EEE8D5"
+        },
+        "QScrollBar::handle:horizontal": {
+            "background": "#D5CCBA"
+        },
+        "QMenuBar": {
+            "background-color": "#E6DFCB",
+            "color": "#586E75",
+            "border-bottom": "1px solid #D5CCBA"
+        },
+        "QMenuBar::item:selected": {
+            "background-color": "#D5CCBA"
+        },
+        "QMenu": {
+            "background-color": "#EEE8D5",
+            "border": "1px solid #D5CCBA"
+        },
+        "QMenu::item:selected": {
+            "background-color": "#D5CCBA",
+            "color": "#073642"
+        },
+        "QPushButton": {
+            "border": "1px solid #D5CCBA",
+            "background-color": "#E6DFCB",
+            "color": "#586E75"
+        },
+        "QPushButton:hover": {
+            "background-color": "#D5CCBA"
+        },
+        "QPushButton:pressed": {
+            "background-color": "#D5CCBA",
+            "border-color": "#2AA198",
+            "color": "#073642"
+        },
+        "#queryToolbar": {
+            "background-color": "#EEE8D5",
+            "border-bottom": "1px solid #D5CCBA"
+        },
+        "#queryToolbar QPushButton": {
+            "background-color": "transparent",
+            "border": "none",
+            "color": "#657B83"
+        },
+        "#queryToolbar QPushButton:hover": {
+            "background-color": "#D5CCBA",
+            "color": "#073642"
+        },
+        "QTabWidget::pane": {
+            "border": "none",
+            "background-color": "#FDF6E3"
+        },
+        "QTabBar::tab:selected": {
+            "border-top": "2px solid #2AA198"
+        },
+        "#results_frame QTabBar::tab": {
+            "background-color": "#EEE8D5"
+        },
+        "#results_frame QTabBar::tab:selected": {
+            "background-color": "#FDF6E3",
+            "border-top": "2px solid #2AA198",
+            "color": "#073642"
+        },
+        "#results_frame QTabBar::tab:hover": {
+            "background-color": "#E6DFCB"
+        },
+        "#queryEditorTabs": {
+            "background-color": "#EEE8D5"
+        },
+        "#queryEditorTabs QTabBar::tab:selected": {
+            "background-color": "#FDF6E3",
+            "border-bottom": "none",
+            "border-top": "2px solid #2AA198"
+        },
+        "#queryEditorTabs QTabBar::tab": {
+            "border-left": "1px solid rgba(0, 43, 54, 0.1)",
+            "border-right": "1px solid rgba(0, 43, 54, 0.1)",
+            "border-top": "1px solid rgba(0, 43, 54, 0.1)"
+        },
+        "QTreeView, QTableView": {
+            "background-color": "#FDF6E3",
+            "alternate-background-color": "#F6F0DE",
+            "gridline-color": "#D5CCBA",
+            "color": "#586E75",
+            "selection-background-color": "#D5CCBA",
+            "selection-color": "#073642"
+        },
+        "QFrame#results_frame QTableView": {
+            "background-color": "#FDF6E3",
+            "alternate-background-color": "#F6F0DE",
+            "border": "1px solid #D5CCBA"
+        },
+        "QHeaderView": {
+            "background-color": "#EEE8D5",
+            "border": "none"
+        },
+        "QHeaderView::section": {
+            "background-color": "#E6DFCB",
+            "color": "#586E75",
+            "border": "none",
+            "border-right": "1px solid #D5CCBA",
+            "border-bottom": "1px solid #D5CCBA"
+        },
+        "QTableCornerButton::section": {
+            "background-color": "#E6DFCB",
+            "border": "none",
+            "border-right": "1px solid #D5CCBA",
+            "border-bottom": "1px solid #D5CCBA"
+        },
+        "QSplitter::handle": {
+            "background": "#D5CCBA"
+        },
+        "QLineEdit": {
+            "background-color": "#FDF6E3",
+            "border": "1px solid #D5CCBA",
+            "color": "#586E75",
+            "selection-background-color": "#D5CCBA",
+            "selection-color": "#073642"
+        },
+        "QLineEdit:focus": {
+            "border": "1px solid #2AA198"
+        },
+        "QCheckBox": {
+            "color": "#586E75",
+            "spacing": "5px"
+        },
+        "QCheckBox::indicator": {
+            "width": "14px",
+            "height": "14px",
+            "border": "1px solid #93A1A1",
+            "background-color": "#FDF6E3",
+            "border-radius": "3px"
+        },
+        "QCheckBox::indicator:hover": {
+            "border": "1px solid #586E75"
+        },
+        "QCheckBox::indicator:checked": {
+            "border": "1px solid #2AA198",
+            "background-color": "#2AA198"
+        },
+        "QListWidget#settingsNav": {
+            "background-color": "#EEE8D5"
+        },
+        "QListWidget#settingsNav::item:selected": {
+            "background-color": "#D5CCBA",
+            "border-left": "2px solid #2AA198",
+            "color": "#073642"
+        },
+        "QComboBox": {
+            "background-color": "#FDF6E3",
+            "border": "1px solid #D5CCBA",
+            "color": "#586E75"
+        },
+        "QComboBox::drop-down": {
+            "border": "none"
+        },
+        "QComboBox QAbstractItemView": {
+            "background-color": "#EEE8D5",
+            "border": "1px solid #D5CCBA",
+            "selection-background-color": "#D5CCBA",
+            "selection-color": "#073642"
+        },
+        "#statusBar": {
+            "background-color": "#EEE8D5",
+            "border-top": "2px solid #2AA198"
+        },
+        "#statusBar QLabel": {
+            "color": "#586E75"
+        },
+        "QPlainTextEdit": {
+            "background-color": "#FDF6E3",
+            "border": "1px solid #D5CCBA"
+        },
+        "#results_frame QPlainTextEdit": {
+            "background-color": "#FDF6E3",
+            "border": "none"
+        },
+        "QFrame#profileCard": {
+            "border-color": "#D8CFB7",
+            "background-color": "#FDF6E3"
+        },
+        "QScrollArea#profileDashboard, QWidget#profileContainer": {
+            "background-color": "#F3ECD8"
+        },
+        "QProgressBar#profileNullBar, QProgressBar#profileUniqueBar": {
+            "background-color": "#E6DFCB"
+        },
+        "QProgressBar#profileNullBar[severity=\"high\"]::chunk": {
+            "background-color": "#E06C75"
+        },
+        "QListWidget#dropZoneList::item:hover, QListWidget#dragSourceList::item:hover": {
+            "background-color": "rgba(0, 0, 0, 0.08)"
+        },
+        "QProgressBar#profileNullBar::chunk, QProgressBar#profileUniqueBar::chunk": {
+            "background-color": "#D5CCBA"
+        },
+        "QLabel#slicerInfoLabel": {
+            "color": "#93A1A1"
+        }
+    },
+    "components": {
+        "lineNumberArea": {
+            "background": "#EEE8D5",
+            "text": "#93A1A1"
+        },
+        "syntax": {
+            "keyword": "#859900",
+            "function": "#268BD2",
+            "string": "#2AA198",
+            "quoted_identifier": "#B58900",
+            "comment": "#93A1A1",
+            "number": "#D33682"
+        },
+        "icon": "#657B83"
+    }
+}

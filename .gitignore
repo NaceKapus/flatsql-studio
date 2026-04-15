@@ -1,0 +1,11 @@
+flatsql.log
+# Ignore Python's cache folder
+__pycache__/
+
+# Ignore DuckDB database files and write-ahead logs
+*.duckdb
+*.duckdb.wal
+
+# Ignore per-user application state
+settings.json
+snippets/

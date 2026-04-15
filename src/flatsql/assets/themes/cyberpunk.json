@@ -1,0 +1,248 @@
+﻿{
+    "name": "Cyberpunk",
+    "description": "Neon-drenched synthwave aesthetic with deep indigo and bright cyan.",
+    "sort_order": 3,
+    "palette": {
+        "Window": "#08080f",
+        "WindowText": "#e2e8f0",
+        "Base": "#0f0f1a",
+        "AlternateBase": "#171726",
+        "Text": "#e2e8f0",
+        "PlaceholderText": "#4b5563",
+        "Button": "#1f1f33",
+        "ButtonText": "#e2e8f0",
+        "Highlight": "#2d2d44",
+        "HighlightedText": "#ffffff",
+        "Disabled": {
+            "Text": "#4b5563",
+            "ButtonText": "#4b5563"
+        }
+    },
+    "stylesheet": {
+        "QFrame#file_explorer_frame, QFrame#db_explorer_frame, QFrame#snippet_frame": {
+            "background-color": "#0f0f1a",
+            "border-right": "1px solid #08080f"
+        },
+        "QFrame#query_frame": {
+            "background-color": "#0f0f1a"
+        },
+        "QFrame#results_frame": {
+            "background-color": "#0f0f1a"
+        },
+        "QScrollBar:vertical": {
+            "background": "#08080f"
+        },
+        "QScrollBar::handle:vertical": {
+            "background": "#1f1f33"
+        },
+        "QScrollBar::handle:vertical:hover": {
+            "background": "#2d2d44"
+        },
+        "QScrollBar:horizontal": {
+            "background": "#08080f"
+        },
+        "QScrollBar::handle:horizontal": {
+            "background": "#1f1f33"
+        },
+        "QMenuBar": {
+            "background-color": "#08080f",
+            "color": "#e2e8f0",
+            "border-bottom": "1px solid #1f1f33"
+        },
+        "QMenuBar::item:selected": {
+            "background-color": "#1f1f33"
+        },
+        "QMenu": {
+            "background-color": "#0f0f1a",
+            "border": "1px solid #2d2d44"
+        },
+        "QMenu::item:selected": {
+            "background-color": "#2d2d44",
+            "color": "#ffffff"
+        },
+        "QPushButton": {
+            "border": "1px solid #2d2d44",
+            "background-color": "#1f1f33",
+            "color": "#e2e8f0"
+        },
+        "QPushButton:hover": {
+            "background-color": "#2d2d44"
+        },
+        "QPushButton:pressed": {
+            "background-color": "#2d2d44",
+            "border-color": "#00f0ff",
+            "color": "#ffffff"
+        },
+        "#queryToolbar": {
+            "background-color": "#0f0f1a",
+            "border-bottom": "1px solid #1f1f33"
+        },
+        "#queryToolbar QPushButton": {
+            "background-color": "transparent",
+            "border": "none",
+            "color": "#e2e8f0"
+        },
+        "#queryToolbar QPushButton:hover": {
+            "background-color": "#1f1f33"
+        },
+        "QTabWidget::pane": {
+            "border": "none",
+            "background-color": "#0f0f1a"
+        },
+        "QTabBar::tab:selected": {
+            "border-top": "2px solid #00f0ff"
+        },
+        "#results_frame QTabBar::tab": {
+            "background-color": "#08080f"
+        },
+        "#results_frame QTabBar::tab:selected": {
+            "background-color": "#1f1f33",
+            "border-top": "2px solid #00f0ff",
+            "color": "#ffffff"
+        },
+        "#results_frame QTabBar::tab:hover": {
+            "background-color": "#2d2d44"
+        },
+        "#queryEditorTabs QTabBar::tab:selected": {
+            "background-color": "#08080f",
+            "border-bottom": "none",
+            "border-top": "2px solid #00f0ff"
+        },
+        "#queryEditorTabs QTabBar::tab": {
+            "border-left": "1px solid rgba(255, 255, 255, 0.05)",
+            "border-right": "1px solid rgba(255, 255, 255, 0.05)",
+            "border-top": "1px solid rgba(255, 255, 255, 0.05)"
+        },
+        "QTreeView, QTableView": {
+            "background-color": "#0f0f1a",
+            "alternate-background-color": "#171726",
+            "gridline-color": "#1f1f33",
+            "color": "#e2e8f0"
+        },
+        "QFrame#results_frame QTableView": {
+            "background-color": "#0f0f1a",
+            "alternate-background-color": "#171726",
+            "border": "1px solid #1f1f33"
+        },
+        "QHeaderView": {
+            "background-color": "#0f0f1a",
+            "border": "none"
+        },
+        "QHeaderView::section": {
+            "background-color": "#1f1f33",
+            "color": "#e2e8f0",
+            "border": "none",
+            "border-right": "1px solid #2d2d44",
+            "border-bottom": "1px solid #2d2d44"
+        },
+        "QTableCornerButton::section": {
+            "background-color": "#1f1f33",
+            "border": "none",
+            "border-right": "1px solid #2d2d44",
+            "border-bottom": "1px solid #2d2d44"
+        },
+        "QSplitter::handle": {
+            "background": "#1f1f33"
+        },
+        "QLineEdit": {
+            "background-color": "#08080f",
+            "border": "1px solid #2d2d44",
+            "color": "#e2e8f0",
+            "selection-background-color": "#2d2d44"
+        },
+        "QLineEdit:focus": {
+            "border": "1px solid #00f0ff"
+        },
+        "QCheckBox": {
+            "color": "#e2e8f0",
+            "spacing": "5px"
+        },
+        "QCheckBox::indicator": {
+            "width": "14px",
+            "height": "14px",
+            "border": "1px solid #4b5563",
+            "background-color": "#08080f",
+            "border-radius": "3px"
+        },
+        "QCheckBox::indicator:hover": {
+            "border": "1px solid #e2e8f0"
+        },
+        "QCheckBox::indicator:checked": {
+            "border": "1px solid #00f0ff",
+            "background-color": "#00f0ff"
+        },
+        "QListWidget#settingsNav": {
+            "background-color": "#08080f"
+        },
+        "QListWidget#settingsNav::item:selected": {
+            "background-color": "#1f1f33",
+            "border-left": "2px solid #00f0ff",
+            "color": "#ffffff"
+        },
+        "QComboBox": {
+            "background-color": "#08080f",
+            "border": "1px solid #2d2d44",
+            "color": "#e2e8f0"
+        },
+        "QComboBox::drop-down": {
+            "border": "none"
+        },
+        "QComboBox QAbstractItemView": {
+            "background-color": "#0f0f1a",
+            "border": "1px solid #2d2d44",
+            "selection-background-color": "#2d2d44"
+        },
+        "#statusBar": {
+            "background-color": "#0f0f1a",
+            "border-top": "2px solid #00f0ff"
+        },
+        "#statusBar QLabel": {
+            "color": "#e2e8f0"
+        },
+        "QPlainTextEdit": {
+            "background-color": "#08080f",
+            "border": "1px solid #1f1f33"
+        },
+        "#results_frame QPlainTextEdit": {
+            "background-color": "#0f0f1a",
+            "border": "none"
+        },
+        "QFrame#profileCard": {
+            "border-color": "#1f1f33",
+            "background-color": "#171726"
+        },
+        "QScrollArea#profileDashboard, QWidget#profileContainer": {
+            "background-color": "#0f0f1a"
+        },
+        "QProgressBar#profileNullBar, QProgressBar#profileUniqueBar": {
+            "background-color": "#1f1f33"
+        },
+        "QProgressBar#profileNullBar[severity=\"high\"]::chunk": {
+            "background-color": "#E06C75"
+        },
+        "QListWidget#dropZoneList::item:hover, QListWidget#dragSourceList::item:hover": {
+            "background-color": "rgba(255, 255, 255, 0.10)"
+        },
+        "QProgressBar#profileNullBar::chunk, QProgressBar#profileUniqueBar::chunk": {
+            "background-color": "#2d2d44"
+        },
+        "QLabel#slicerInfoLabel": {
+            "color": "#4b5563"
+        }
+    },
+    "components": {
+        "lineNumberArea": {
+            "background": "#0f0f1a",
+            "text": "#4b5563"
+        },
+        "syntax": {
+            "keyword": "#ff007f",
+            "function": "#00f0ff",
+            "string": "#39ff14",
+            "quoted_identifier": "#e2e8f0",
+            "comment": "#6b7280",
+            "number": "#fce83a"
+        },
+        "icon": "#e2e8f0"
+    }
+}

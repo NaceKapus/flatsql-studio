@@ -1,0 +1,449 @@
+/* =======================================================
+   1. Global & Generic Widget Styles
+   ======================================================= */
+
+QWidget {
+    outline: none; /* Removes the dotted focus line */
+}
+
+/* Generic Frame Styles (Explorer, Query, Results) */
+QFrame#file_explorer_frame, 
+QFrame#db_explorer_frame, 
+QFrame#query_frame, 
+QFrame#results_frame {
+    border: none; /* Remove frame borders for a cleaner "seamless" look */
+}
+
+/* =======================================================
+   2. Scrollbars (Modern & Slim)
+   ======================================================= */
+
+QScrollBar:vertical {
+    border: none;
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+
+QScrollBar::handle:vertical {
+    min-height: 20px;
+    border-radius: 5px;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    border: none;
+    height: 10px;
+    margin: 0px 0px 0px 0px;
+}
+
+QScrollBar::handle:horizontal {
+    min-width: 20px;
+    border-radius: 5px;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* =======================================================
+   3. Menus & Navigation
+   ======================================================= */
+
+QMenuBar {
+    padding: 2px;
+    background-color: palette(window);
+    color: palette(window-text);
+    border-bottom: 1px solid palette(mid);
+}
+
+QMenuBar::item {
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+QMenu {
+    padding: 4px;
+    border-radius: 6px;
+    background-color: palette(window);
+    color: palette(text);
+    border: 1px solid palette(mid);
+}
+
+QMenu::item {
+    padding: 6px 24px 6px 10px; /* ample padding for touch targets */
+    border-radius: 4px;
+}
+
+QMenu::item:selected {
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+}
+
+/* =======================================================
+   4. Buttons & Toolbar
+   ======================================================= */
+
+/* Global Button Style */
+QPushButton {
+    border-radius: 4px;
+    padding: 6px 12px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: palette(mid);
+    background-color: palette(button);
+    color: palette(button-text);
+    /*font-weight: 600;*/
+}
+
+QPushButton:hover {
+    background-color: palette(alternate-base);
+}
+
+/* Toolbar Container */
+#queryToolbar {
+    padding: 4px;
+    background-color: palette(window);
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: palette(mid);
+}
+
+/* Toolbar Buttons */
+#queryToolbar QPushButton {
+    border: none;
+    border-radius: 4px;
+    padding: 6px;
+    margin: 0px 2px;
+}
+
+/* =======================================================
+   5. Tab Widgets (Modern Style)
+   ======================================================= */
+
+QTabWidget::pane {
+    border-top-width: 1px;
+    border-top-style: solid;
+    border-top-color: palette(mid);
+    background-color: palette(base);
+}
+
+/* Global Tab Style (Results, Messages, etc.) */
+QTabBar::tab {
+    font-size: 10pt;
+    border: none;
+    padding: 6px 12px;
+    min-width: 60px;
+    background-color: palette(window);
+    color: palette(placeholder-text);
+}
+
+QTabBar::tab:selected {
+    background-color: palette(base);
+    color: palette(text);
+}
+
+QTabBar::tab:hover {
+    background-color: palette(alternate-base);
+    color: palette(text);
+}
+
+/* Query Editors Tabs (compact look) */
+#queryEditorTabs QTabBar::tab {
+    font-size: 9pt;
+    min-width: 90px;
+    max-width: 180px;
+    text-align: left;
+}
+
+/* --- Results Panel Tabs Structure --- */
+#results_frame QTabWidget::tab-bar {
+    left: 8px; 
+}
+
+/* =======================================================
+   6. Data Views (Trees, Tables & Splitters)
+   ======================================================= */
+
+QTreeView, QTableView {
+    padding: 0px;
+    border: none;
+    background-color: palette(base);
+    alternate-background-color: palette(alternate-base);
+    gridline-color: palette(mid);
+    color: palette(text);
+    selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text);
+}
+
+QTreeView::item {
+    padding: 2px 4px; 
+}
+
+QTableView::item {
+    padding: 1px 4px; 
+}
+
+/* --- Modern Header Styling --- */
+
+QHeaderView {
+    border: none;
+}
+
+QHeaderView::section {
+    padding: 4px 12px;
+    border: none;
+    font-weight: bold;
+    background-color: palette(alternate-base);
+    color: palette(text);
+    border-right: 1px solid palette(mid);
+    border-bottom: 1px solid palette(mid);
+}
+
+/* Remove the right border from the last column for a clean edge 
+QHeaderView::section:last {
+    border-right: none;
+}
+*/
+
+/* Style the top-left corner button to match the headers */
+QTableCornerButton::section {
+    border: none;
+    background-color: palette(alternate-base);
+    border-right: 1px solid palette(mid);
+    border-bottom: 1px solid palette(mid);
+}
+
+QLabel#panelHeader {
+    padding: 4px;
+    font-weight: bold;
+}
+
+QPushButton#resultsToolbarButton {
+    padding: 5px 10px;
+}
+
+QToolButton#queryTabCloseButton {
+    margin-right: 4px;
+}
+
+QFrame#queryEmptyStateCard {
+    border-width: 2px;
+    border-style: dashed;
+    border-color: palette(text);
+    border-radius: 14px;
+    background-color: transparent;
+}
+
+QFrame#queryEmptyStateCard[dragActive="true"] {
+    border-color: palette(highlight);
+    background-color: palette(alternate-base);
+}
+
+QLabel#queryEmptyStateTitle {
+    padding: 0px 0px 6px 0px;
+    font-weight: bold;
+    font-size: 12pt;
+}
+
+QPushButton#queryEmptyStatePrimaryButton,
+QPushButton#queryEmptyStateSecondaryButton {
+    padding: 8px 14px;
+    min-width: 120px;
+}
+
+QListWidget#dropZoneList::item,
+QListWidget#dragSourceList::item {
+    padding: 6px 8px;
+    margin: 3px 2px;
+    min-height: 18px;
+    border-radius: 4px;
+}
+
+QListWidget#dropZoneList::item:hover,
+QListWidget#dragSourceList::item:hover {
+}
+
+QLabel#slicerInfoLabel {
+}
+
+QFrame#profileCard {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 6px;
+}
+
+QScrollArea#profileDashboard,
+QWidget#profileContainer {
+}
+
+QProgressBar#profileNullBar,
+QProgressBar#profileUniqueBar {
+    border: none;
+    border-radius: 3px;
+}
+
+QProgressBar#profileNullBar::chunk,
+QProgressBar#profileUniqueBar::chunk {
+    border-radius: 3px;
+}
+
+QProgressBar#profileNullBar[severity="high"]::chunk {
+}
+
+QSplitter::handle {
+    width: 4px;
+    height: 4px;
+    background: palette(mid);
+}
+
+/* =======================================================
+   7. Inputs & Find/Replace
+   ======================================================= */
+
+QLineEdit {
+    padding: 4px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-style: solid;
+    background-color: palette(base);
+    border-color: palette(mid);
+    color: palette(text);
+    selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text);
+}
+
+#findReplaceWidget {
+    border-radius: 4px;
+    border-width: 1px;
+    border-style: solid;
+}
+
+/* CheckBoxes */
+QCheckBox {
+    spacing: 5px;
+}
+
+QCheckBox::indicator {
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: palette(mid);
+    background-color: palette(base);
+}
+
+/* =======================================================
+   8. Settings Navigation (Sidebar)
+   ======================================================= */
+
+QListWidget#settingsNav {
+    border: none;            
+    padding: 5px;
+    outline: none;
+}
+
+QListWidget#settingsNav::item {
+    padding: 10px 12px;
+    margin-bottom: 5px;
+    border-radius: 6px;
+    border: none;
+}
+
+QListWidget#settingsNav::item:selected {
+    font-weight: bold;
+}
+
+QListWidget#connectionTypeList {
+    border: none;
+    padding: 4px;
+    outline: none;
+}
+
+QListWidget#connectionTypeList::item {
+    padding: 12px;
+    margin: 4px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-style: solid;
+}
+
+QListWidget#connectionTypeList::item:hover {
+    border-width: 2px;
+    padding: 11px;
+    background-color: palette(alternate-base);
+}
+
+QListWidget#connectionTypeList::item:selected {
+    border-width: 2px;
+    padding: 11px;
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+}
+
+QListWidget#connectionTypeList::item:selected:hover {
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+}
+
+/* =======================================================
+   9. Combo Boxes (Dropdowns)
+   ======================================================= */
+
+QComboBox {
+    border-radius: 4px;
+    padding: 0px 10px;
+    min-height: 1.5em;
+    background-color: palette(base);
+    border: 1px solid palette(mid);
+    color: palette(text);
+}
+
+QComboBox:on { 
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;	
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+QComboBox::down-arrow { 
+    width: 12px;
+    height: 12px;
+    image: url("{{ASSETS_DIR}}/img/{{DROPDOWN_ICON_NAME}}"); 
+}
+
+/* The Popup List */
+QComboBox QAbstractItemView {
+    border-radius: 4px;
+    outline: none;
+    padding: 4px;
+    margin-top: 2px;
+    background-color: palette(window);
+    border: 1px solid palette(mid);
+    selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text);
+}
+
+QComboBox QAbstractItemView::item {
+    padding: 8px 10px;  
+    border-radius: 4px;
+    border: none; 
+	margin: 2px 4px;
+}
+
+/* =======================================================
+   10. Status Bar
+   ======================================================= */
+
+#statusBar QLabel {
+    padding: 6px
+}
