@@ -1,4 +1,4 @@
-"""DuckDB engine wrapper used by FlatSQL."""
+"""DuckDB engine wrapper used by FlatSQL Studio."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 
 
 class FlatEngine:
-    """Manage DuckDB connections and metadata queries for FlatSQL."""
+    """Manage DuckDB connections and metadata queries for FlatSQL Studio."""
 
     _QUOTED_IDENTIFIER_PART = r'"(?:[^"]|"")+"'
     _UNQUOTED_IDENTIFIER_PART = r'[A-Za-z_][A-Za-z0-9_]*'

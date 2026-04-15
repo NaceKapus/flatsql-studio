@@ -1,6 +1,6 @@
-# Contributing to FlatSQL
+# Contributing to FlatSQL Studio
 
-Thank you for contributing to FlatSQL.
+Thank you for contributing to FlatSQL Studio.
 
 ## Before You Start
 

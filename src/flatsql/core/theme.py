@@ -1,4 +1,4 @@
-"""Theme loading and application utilities for FlatSQL."""
+"""Theme loading and application utilities for FlatSQL Studio."""
 
 from __future__ import annotations
 

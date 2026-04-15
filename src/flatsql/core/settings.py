@@ -1,4 +1,4 @@
-"""Application settings persistence for FlatSQL."""
+"""Application settings persistence for FlatSQL Studio."""
 
 from __future__ import annotations
 

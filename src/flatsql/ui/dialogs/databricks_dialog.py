@@ -12,6 +12,10 @@ from PySide6.QtWidgets import (
 )
 
 
+_DATABRICKS_KEYRING_SERVICE = "FlatSQLStudio_Databricks"
+_LEGACY_DATABRICKS_KEYRING_SERVICE = "FlatSQL_Databricks"
+
+
 class UnityCatalogDialog(QDialog):
     """Dialog for connecting to Databricks Unity Catalog.
     
@@ -68,9 +72,11 @@ class UnityCatalogDialog(QDialog):
         url = self.workspace_url_input.text().strip().rstrip("/")
         if url:
             # Look up the token in Windows Credential Manager / Mac Keychain
-            saved_token = keyring.get_password("FlatSQL_Databricks", url)
-            if saved_token:
-                self.token_input.setText(saved_token)
+            for service_name in (_DATABRICKS_KEYRING_SERVICE, _LEGACY_DATABRICKS_KEYRING_SERVICE):
+                saved_token = keyring.get_password(service_name, url)
+                if saved_token:
+                    self.token_input.setText(saved_token)
+                    break
 
     def _on_accept(self) -> None:
         """Accept the dialog (wrapper for consistency)."""

@@ -34,7 +34,7 @@ def to_duckdb_relation(path_value: str | os.PathLike[str]) -> str:
     """Return a DuckDB relation expression for a file path or glob.
 
     Plain file paths can be referenced directly by DuckDB for the formats
-    FlatSQL already supports. Some extension aliases need explicit reader
+    FlatSQL Studio already supports. Some extension aliases need explicit reader
     functions so DuckDB interprets them correctly.
 
     Args:

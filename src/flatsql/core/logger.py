@@ -1,4 +1,4 @@
-"""Application logging utilities for FlatSQL."""
+"""Application logging utilities for FlatSQL Studio."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ _BACKUP_COUNT: Final[int] = 5
 
 
 def _normalize_logger_name(name: str) -> str:
-    """Normalize module logger names relative to the FlatSQL root logger."""
+    """Normalize module logger names relative to the FlatSQL Studio root logger."""
     prefix = f"{_LOGGER_NAME}."
     if name.startswith(prefix):
         return name[len(prefix):]
@@ -24,17 +24,17 @@ def _normalize_logger_name(name: str) -> str:
 
 
 def _get_log_directory() -> str:
-    """Return the directory used for persistent FlatSQL log files."""
+    """Return the directory used for persistent FlatSQL Studio log files."""
     return os.path.dirname(SETTINGS_PATH)
 
 
 def _get_log_file_path() -> str:
-    """Return the full path to the FlatSQL log file."""
+    """Return the full path to the FlatSQL Studio log file."""
     return os.path.join(_get_log_directory(), _LOG_FILE_NAME)
 
 
 def configure_logging(level: int = logging.INFO) -> logging.Logger:
-    """Configure and return the shared FlatSQL application logger."""
+    """Configure and return the shared FlatSQL Studio application logger."""
     logger = logging.getLogger(_LOGGER_NAME)
     if getattr(logger, "_flatsql_configured", False):
         logger.setLevel(level)
@@ -71,7 +71,7 @@ def configure_logging(level: int = logging.INFO) -> logging.Logger:
 
 
 def get_logger(name: str | None = None) -> logging.Logger:
-    """Return a configured logger scoped to the FlatSQL logger hierarchy."""
+    """Return a configured logger scoped to the FlatSQL Studio logger hierarchy."""
     base_logger = configure_logging()
     if not name:
         return base_logger

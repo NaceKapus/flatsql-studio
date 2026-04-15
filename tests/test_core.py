@@ -1,4 +1,4 @@
-"""Unit tests for FlatSQL core business logic.
+"""Unit tests for FlatSQL Studio core business logic.
 
 These tests cover the modules that contain pure Python logic and do not
 require a running Qt application or a real filesystem connection:
