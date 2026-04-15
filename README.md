@@ -13,7 +13,7 @@ FlatSQL Studio is a desktop SQL client for querying flat files and cloud-backed 
 - Results grid, messages panel, and profiling/visualization tools.
 - Theme support with multiple bundled themes.
 - Export to CSV, Parquet, JSON, and Excel.
-- Ability to mount external file systems (e.g. Azure) or databases (DuckDB, Databricks etc.)
+- Ability to mount external file systems (for example Azure) and databases (for example DuckDB and Databricks).
 
 ## Tech Stack
 
@@ -67,6 +67,14 @@ python run.py
 4. Review results in the grid and messages tabs.
 5. Save useful queries as snippets for reuse.
 
+## Verify
+
+Run tests:
+
+```bash
+pytest
+```
+
 ## Architecture
 
 FlatSQL Studio follows a layered architecture:
@@ -75,21 +83,11 @@ FlatSQL Studio follows a layered architecture:
 - ui: panels, dialogs, models, and custom widgets.
 - main window: composition and signal wiring between UI and controllers.
 
-See ARCHITECTURE.md for a full walkthrough.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a full walkthrough.
 
 ## Development
 
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the app:
-
-```bash
-python run.py
-```
+For contributor setup, workflow, and expectations, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
@@ -104,7 +102,7 @@ FlatSQL Studio is licensed under the MIT License. See [LICENSE](LICENSE) for det
 - Additional connectors (AWS, GCP, and more).
 - Built-in Delta support.
 - Additional database explorer functionality.
-- Flat file pivot tables
-- Data & Schema Compare tools
-- Advanced Snippet functionalites (e.g. parameters)
+- Flat file pivot tables.
+- Data and schema compare tools.
+- Advanced snippet functionalities (for example parameters).
 
