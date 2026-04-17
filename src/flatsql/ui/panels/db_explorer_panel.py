@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 import qtawesome as qta
-from PySide6.QtCore import QPoint, Qt, Signal, QModelIndex, QTimer
+from PySide6.QtCore import QPoint, Qt, Signal, QModelIndex
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QMenu,
     QPushButton,
-    QLineEdit,
     QSizePolicy,
     QVBoxLayout,
 )
@@ -49,14 +48,6 @@ class DBExplorerPanel(QFrame):
         self.settings_manager = settings_manager
         self.theme_manager = theme_manager
         self.connections = connections
-        self._active_filter_query = ""
-        self._search_preload_done = False
-        self._pre_search_expanded_keys: set[tuple[str, ...]] | None = None
-        self._filter_timer = QTimer(self)
-        self._filter_timer.setSingleShot(True)
-        self._filter_timer.setInterval(120)
-        self._filter_timer.timeout.connect(self._apply_filter_from_input)
-
         self.setObjectName("db_explorer_frame")
         self.setFrameShape(QFrame.StyledPanel)
         self.layout = QVBoxLayout(self)
@@ -85,13 +76,6 @@ class DBExplorerPanel(QFrame):
         self.connection_combo.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
         self.connection_combo.currentIndexChanged.connect(self.active_connection_changed.emit)
 
-        self.filter_input = QLineEdit(self)
-        self.filter_input.setObjectName("dbExplorerFilterInput")
-        self.filter_input.setPlaceholderText("Search")
-        self.filter_input.setClearButtonEnabled(True)
-        self.filter_input.textChanged.connect(self._schedule_filter)
-        self.layout.addWidget(self.filter_input)
-
         # Tree View
         self.db_model = QStandardItemModel()
         self.db_tree = ExplorerTreeView()
@@ -111,137 +95,6 @@ class DBExplorerPanel(QFrame):
 
         self.connection_combo = combo
         self.connection_combo.currentIndexChanged.connect(self.active_connection_changed.emit)
-
-    def _schedule_filter(self, _: str) -> None:
-        """Debounce filter updates to keep typing responsive on large trees."""
-        self._filter_timer.start()
-
-    def _apply_filter_from_input(self) -> None:
-        """Apply the current search text to loaded database tree nodes."""
-        previous_query = self._active_filter_query
-        query = self.filter_input.text().strip().lower()
-        if query == self._active_filter_query:
-            return
-
-        if query and not previous_query:
-            self._pre_search_expanded_keys = self._capture_expanded_state()
-
-        self._active_filter_query = query
-
-        if query:
-            if not self._search_preload_done:
-                self._preload_lazy_search_nodes(node_budget=160)
-                self._search_preload_done = True
-        else:
-            self._search_preload_done = False
-
-        self._apply_filter()
-
-        if not query and previous_query and self._pre_search_expanded_keys is not None:
-            self._restore_expanded_state_exact(self._pre_search_expanded_keys)
-            self._pre_search_expanded_keys = None
-
-    def _restore_expanded_state_exact(self, expanded_keys: set[tuple[str, ...]]) -> None:
-        """Restore expansion to an exact previous state by collapsing extras first."""
-        for item in self._iter_items():
-            index: QModelIndex = self.db_model.indexFromItem(item)
-            if index.isValid() and self.db_tree.isExpanded(index):
-                self.db_tree.setExpanded(index, False)
-        self._restore_expanded_state(expanded_keys)
-
-    @staticmethod
-    def _has_placeholder_child(item: QStandardItem) -> bool:
-        """Return whether an item still has an unresolved lazy-load placeholder."""
-        return item.rowCount() > 0 and (item.child(0).text() or "") == ""
-
-    @staticmethod
-    def _normalized_item_text(item: QStandardItem) -> str | None:
-        """Return item text without transient suffix, or None for deleted wrappers."""
-        try:
-            return (item.text() or "").replace(" (expanding...)", "")
-        except RuntimeError:
-            # Qt may delete wrappers when lazy expansion mutates model rows.
-            return None
-
-    def _preload_lazy_search_nodes(self, node_budget: int) -> None:
-        """Load a bounded set of lazy nodes so search works before manual expansion.
-
-        Columns and constraints are loaded on-demand. Without this pass, initial
-        filtering cannot match column/constraint names until users expand folders.
-
-        Args:
-            node_budget: Maximum number of lazy nodes to expand during preload.
-        """
-        processed = 0
-        while processed < node_budget:
-            expanded_in_pass = False
-            for item in self._iter_items():
-                cleaned_text = self._normalized_item_text(item)
-                if cleaned_text not in {"Columns", "Constraints"}:
-                    continue
-                if not self._has_placeholder_child(item):
-                    continue
-
-                index: QModelIndex = self.db_model.indexFromItem(item)
-                if not index.isValid():
-                    continue
-
-                self._on_item_expanded(index)
-                processed += 1
-                expanded_in_pass = True
-                # Lazy expansion mutates model rows; restart from a fresh snapshot.
-                break
-
-            if not expanded_in_pass:
-                break
-
-    def _item_matches_filter(self, item: QStandardItem, query: str) -> bool:
-        """Return whether this item matches the active filter query."""
-        if not query:
-            return True
-
-        label = (item.text() or "").lower()
-        item_kind = str(item.data(Qt.UserRole + 1) or "").lower()
-        connection_key = str(item.data(Qt.UserRole + 2) or "").lower()
-        return query in label or query in item_kind or query in connection_key
-
-    def _set_item_hidden(self, item: QStandardItem, hidden: bool) -> None:
-        """Hide or show a model row in the database tree."""
-        parent_item = item.parent()
-        parent_index = self.db_model.indexFromItem(parent_item) if parent_item else QModelIndex()
-        self.db_tree.setRowHidden(item.row(), parent_index, hidden)
-
-    def _apply_filter_to_item(self, item: QStandardItem, query: str) -> bool:
-        """Recursively evaluate visibility for an item and descendants."""
-        descendant_match = False
-        for row in range(item.rowCount()):
-            child_item = item.child(row)
-            if child_item and self._apply_filter_to_item(child_item, query):
-                descendant_match = True
-
-        self_match = self._item_matches_filter(item, query)
-        is_visible = (not query) or self_match or descendant_match
-        self._set_item_hidden(item, not is_visible)
-
-        if query and len(query) >= 2 and descendant_match:
-            index = self.db_model.indexFromItem(item)
-            if index.isValid():
-                self.db_tree.setExpanded(index, True)
-
-        return is_visible
-
-    def _apply_filter(self) -> None:
-        """Filter currently loaded tree nodes without querying metadata again."""
-        root = self.db_model.invisibleRootItem()
-        self.db_tree.setUpdatesEnabled(False)
-        try:
-            for row in range(root.rowCount()):
-                item = root.child(row)
-                if item:
-                    self._apply_filter_to_item(item, self._active_filter_query)
-        finally:
-            self.db_tree.setUpdatesEnabled(True)
-            self.db_tree.viewport().update()
 
     def _item_state_key(self, item: QStandardItem) -> tuple[str, ...]:
         """Build a stable hierarchical key for expansion state restoration.
@@ -324,8 +177,6 @@ class DBExplorerPanel(QFrame):
         expanded_keys = self._capture_expanded_state() if preserve_expansion else set()
         selected_key = self.connection_combo.currentData()
         self.db_model.clear()
-        self._search_preload_done = False
-        self._pre_search_expanded_keys = None
         self.connection_combo.blockSignals(True)
         self.connection_combo.clear()
 
@@ -454,8 +305,6 @@ class DBExplorerPanel(QFrame):
         if preserve_expansion:
             self._restore_expanded_state(expanded_keys)
 
-        self._apply_filter()
-
     def update_theme(
         self,
         theme_colors: dict[str, Any],
@@ -528,8 +377,6 @@ class DBExplorerPanel(QFrame):
 
         finally:
             self.db_tree.set_loading_state(index, False)
-            if self._active_filter_query:
-                self._apply_filter()
 
     def _show_context_menu(self, point: QPoint) -> None:
         """Open the context menu for connections and database objects."""
