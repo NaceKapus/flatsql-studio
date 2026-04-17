@@ -352,7 +352,7 @@ self.query_panel.run_query_requested.connect(
 
 1. **Clone the repository:**
    ```bash
-  git clone https://github.com/yourusername/flatsql-studio.git
+  git clone https://github.com/NaceKapus/flatsql-studio.git
   cd flatsql-studio
    ```
 
@@ -374,7 +374,18 @@ self.query_panel.run_query_requested.connect(
 
 ### Running Tests
 
-(To be added when test suite is established)
+The test suite lives in `tests/test_core.py` and uses **pytest**. Tests cover core business logic, UI widgets, and regression cases — all disk I/O uses `tmp_path` so nothing pollutes real settings or data files.
+
+```bash
+pip install pytest
+pytest tests/
+```
+
+Run a specific test class:
+
+```bash
+pytest tests/test_core.py::TestSQLGeneratorMerge
+```
 
 ---
 
