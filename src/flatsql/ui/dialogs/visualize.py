@@ -10,11 +10,12 @@ import qtawesome as qta
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QPalette
+from PySide6.QtGui import QPainter, QPalette
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -29,6 +30,40 @@ from PySide6.QtWidgets import (
 from flatsql.ui.widgets import DownwardComboBox, DropZoneList, MultiselectComboBox
 
 matplotlib.use("QtAgg")
+
+
+class _VisualizeDropZone(DropZoneList):
+    """DropZoneList with empty-state placeholder text and drag-hover accent border."""
+
+    def __init__(self, placeholder: str, max_height: int = 70, parent: QWidget | None = None) -> None:
+        super().__init__(max_height=max_height, parent=parent)
+        self._placeholder = placeholder
+
+    def paintEvent(self, event: Any) -> None:
+        super().paintEvent(event)
+        if self.count() == 0:
+            painter = QPainter(self.viewport())
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setPen(self.palette().color(QPalette.PlaceholderText))
+            painter.drawText(self.viewport().rect(), Qt.AlignCenter, self._placeholder)
+
+    def dragEnterEvent(self, event: Any) -> None:
+        self.setProperty("dragOver", "true")
+        self.style().unpolish(self)
+        self.style().polish(self)
+        super().dragEnterEvent(event)
+
+    def dragLeaveEvent(self, event: Any) -> None:
+        self.setProperty("dragOver", "false")
+        self.style().unpolish(self)
+        self.style().polish(self)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event: Any) -> None:
+        self.setProperty("dragOver", "false")
+        self.style().unpolish(self)
+        self.style().polish(self)
+        super().dropEvent(event)
 
 
 class VisualizeDialog(QDialog):
@@ -47,18 +82,27 @@ class VisualizeDialog(QDialog):
         self.active_filters: dict[str, tuple[str, QWidget]] = {}
 
         self.setWindowTitle("Visualize Data")
-        self.resize(1150, 700)
+        self.resize(1200, 720)
 
         main_layout = QHBoxLayout(self)
+        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(12, 12, 12, 12)
 
-        col_layout = QVBoxLayout()
-        col_layout.setSpacing(8)
+        # --- Left panel: Fields ---
+        field_panel = QFrame()
+        field_panel.setObjectName("fieldPanel")
+        col_layout = QVBoxLayout(field_panel)
+        col_layout.setSpacing(6)
+        col_layout.setContentsMargins(10, 12, 10, 12)
 
-        col_layout.addWidget(QLabel("<b>Attributes</b>"))
+        attr_header = QLabel("ATTRIBUTES")
+        attr_header.setObjectName("sectionHeader")
+        col_layout.addWidget(attr_header)
+
         self.attributes_list = QListWidget()
         self.attributes_list.setObjectName("dragSourceList")
-        self.attributes_list.setMinimumWidth(220)
-        self.attributes_list.setMinimumHeight(180)
+        self.attributes_list.setMinimumWidth(200)
+        self.attributes_list.setMinimumHeight(160)
         self.attributes_list.setSpacing(2)
         self.attributes_list.setUniformItemSizes(True)
         self.attributes_list.setDragEnabled(True)
@@ -71,13 +115,16 @@ class VisualizeDialog(QDialog):
         )
         col_layout.addWidget(self.attributes_list, stretch=1)
 
-        col_layout.addSpacing(10)
+        col_layout.addSpacing(8)
 
-        col_layout.addWidget(QLabel("<b>Measures</b>"))
+        meas_header = QLabel("MEASURES")
+        meas_header.setObjectName("sectionHeader")
+        col_layout.addWidget(meas_header)
+
         self.measures_avail_list = QListWidget()
         self.measures_avail_list.setObjectName("dragSourceList")
-        self.measures_avail_list.setMinimumWidth(220)
-        self.measures_avail_list.setMinimumHeight(180)
+        self.measures_avail_list.setMinimumWidth(200)
+        self.measures_avail_list.setMinimumHeight(160)
         self.measures_avail_list.setSpacing(2)
         self.measures_avail_list.setUniformItemSizes(True)
         self.measures_avail_list.setDragEnabled(True)
@@ -100,11 +147,21 @@ class VisualizeDialog(QDialog):
             else:
                 self.attributes_list.addItem(item)
 
-        main_layout.addLayout(col_layout, stretch=2)
+        main_layout.addWidget(field_panel, stretch=2)
 
-        settings_layout = QVBoxLayout()
-        settings_layout.addWidget(QLabel("<b>Chart Type</b>"))
+        # --- Settings panel ---
+        settings_panel = QFrame()
+        settings_panel.setObjectName("settingsPanel")
+        settings_layout = QVBoxLayout(settings_panel)
+        settings_layout.setSpacing(8)
+        settings_layout.setContentsMargins(10, 12, 10, 12)
+
+        chart_header = QLabel("CHART TYPE")
+        chart_header.setObjectName("sectionHeader")
+        settings_layout.addWidget(chart_header)
+
         chart_type_layout = QHBoxLayout()
+        chart_type_layout.setSpacing(0)
 
         self.chart_type_group = QButtonGroup(self)
         self.chart_type_group.setExclusive(True)
@@ -112,12 +169,15 @@ class VisualizeDialog(QDialog):
         self.btn_bar = QPushButton(qta.icon("fa5s.chart-bar"), "Bar")
         self.btn_bar.setCheckable(True)
         self.btn_bar.setChecked(True)
+        self.btn_bar.setObjectName("chartTypeBtnLeft")
 
         self.btn_line = QPushButton(qta.icon("fa5s.chart-line"), "Line")
         self.btn_line.setCheckable(True)
+        self.btn_line.setObjectName("chartTypeBtnMid")
 
         self.btn_scatter = QPushButton(qta.icon("mdi.scatter-plot"), "Scatter")
         self.btn_scatter.setCheckable(True)
+        self.btn_scatter.setObjectName("chartTypeBtnRight")
 
         for btn in (self.btn_bar, self.btn_line, self.btn_scatter):
             self.chart_type_group.addButton(btn)
@@ -125,10 +185,12 @@ class VisualizeDialog(QDialog):
 
         self.chart_type_group.buttonClicked.connect(self._draw_chart)
         settings_layout.addLayout(chart_type_layout)
-        settings_layout.addSpacing(15)
+        settings_layout.addSpacing(12)
 
-        settings_layout.addWidget(QLabel("<b>X-Axis</b>"))
-        self.x_list = DropZoneList(max_height=50)
+        x_header = QLabel("X-AXIS")
+        x_header.setObjectName("sectionHeader")
+        settings_layout.addWidget(x_header)
+        self.x_list = _VisualizeDropZone("Drop a field here", max_height=50)
         self.x_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.x_list.customContextMenuRequested.connect(
             lambda pos: self._show_dropzone_context_menu(pos, self.x_list, "X")
@@ -139,10 +201,12 @@ class VisualizeDialog(QDialog):
         self.x_list.model().rowsRemoved.connect(lambda: QTimer.singleShot(0, self._draw_chart))
         settings_layout.addWidget(self.x_list)
 
-        settings_layout.addSpacing(10)
+        settings_layout.addSpacing(8)
 
-        settings_layout.addWidget(QLabel("<b>Y-Axis</b>"))
-        self.y_list = DropZoneList(max_height=100)
+        y_header = QLabel("Y-AXIS")
+        y_header.setObjectName("sectionHeader")
+        settings_layout.addWidget(y_header)
+        self.y_list = _VisualizeDropZone("Drop measures here", max_height=100)
         self.y_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.y_list.customContextMenuRequested.connect(
             lambda pos: self._show_dropzone_context_menu(pos, self.y_list, "Y")
@@ -153,10 +217,12 @@ class VisualizeDialog(QDialog):
         self.y_list.model().rowsRemoved.connect(lambda: QTimer.singleShot(0, self._draw_chart))
         settings_layout.addWidget(self.y_list)
 
-        settings_layout.addSpacing(10)
+        settings_layout.addSpacing(8)
 
-        settings_layout.addWidget(QLabel("<b>Filters</b>"))
-        self.filters_list = DropZoneList(max_height=100)
+        filter_header = QLabel("FILTERS")
+        filter_header.setObjectName("sectionHeader")
+        settings_layout.addWidget(filter_header)
+        self.filters_list = _VisualizeDropZone("Drop fields to filter", max_height=100)
         self.filters_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.filters_list.customContextMenuRequested.connect(
             lambda pos: self._show_dropzone_context_menu(pos, self.filters_list, "Filter")
@@ -168,16 +234,18 @@ class VisualizeDialog(QDialog):
         settings_layout.addWidget(self.filters_list)
 
         settings_layout.addStretch()
-        main_layout.addLayout(settings_layout, stretch=2)
+        main_layout.addWidget(settings_panel, stretch=2)
 
+        # --- Right pane: slicer bar + chart ---
         right_pane_layout = QVBoxLayout()
+        right_pane_layout.setSpacing(6)
 
         self.slicer_container = QWidget()
         self.slicer_layout = QHBoxLayout(self.slicer_container)
         self.slicer_layout.setContentsMargins(0, 0, 0, 10)
+        self.slicer_layout.setSpacing(8)
         self.slicer_layout.setAlignment(Qt.AlignLeft)
-
-        self.slicer_label = QLabel("")
+        self.slicer_label = QLabel("No active filters")
         self.slicer_label.setObjectName("slicerInfoLabel")
         self.slicer_layout.addWidget(self.slicer_label)
         right_pane_layout.addWidget(self.slicer_container)
@@ -406,6 +474,8 @@ class VisualizeDialog(QDialog):
         self.ax.spines["left"].set_color(self.plot_text_color)
         self.ax.spines["top"].set_visible(False)
         self.ax.spines["right"].set_visible(False)
+        self.ax.yaxis.grid(True, linestyle="--", alpha=0.25, color=self.plot_text_color)
+        self.ax.set_axisbelow(True)
 
     def _reset_visual(self) -> None:
         """Reset all configured axes and filters and clear the chart canvas."""
@@ -545,7 +615,10 @@ class VisualizeDialog(QDialog):
 
                 if chart_type == "Bar":
                     offsets = [x - 0.4 + (i + 0.5) * bar_width for x in x_indices]
-                    self.ax.bar(offsets, y_data, width=bar_width, label=display_name, color=color)
+                    self.ax.bar(
+                        offsets, y_data, width=bar_width, label=display_name,
+                        color=color, edgecolor="none",
+                    )
                 elif chart_type == "Line":
                     self.ax.plot(x_data, y_data, marker="o", linewidth=2, label=display_name, color=color)
                 elif chart_type == "Scatter":
@@ -575,7 +648,7 @@ class VisualizeDialog(QDialog):
                     labelcolor=self.plot_text_color,
                 )
 
-            self.figure.tight_layout()
+            self.figure.tight_layout(pad=1.5)
             self.canvas.draw()
         except Exception as exc:
             QMessageBox.critical(
