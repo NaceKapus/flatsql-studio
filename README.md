@@ -1,11 +1,10 @@
-# FlatSQL Studio
+# FlatSQL Studio ![FlatSQL Studio]
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<!-- TODO: Add demo gif. Recommended flow: drag file in → write query → run → see results. Max ~5MB. -->
-<!-- ![FlatSQL Studio demo](docs/demo.gif) -->
+A full-featured GUI SQL IDE built for the DuckDB-native workflow.
 
-A full-featured GUI SQL IDE built for the DuckDB-native workflow — query CSV, Parquet, JSON, and cloud files directly, no database server required.
+![FlatSQL Studio](./flatsql-studio.png)
 
 > **Platform support:** Windows only for now. macOS support is planned.
 
