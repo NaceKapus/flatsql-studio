@@ -1,4 +1,4 @@
-# FlatSQL Studio ![FlatSQL Studio]
+# FlatSQL Studio
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
