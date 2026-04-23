@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import datetime
-import os
 
 import duckdb
 
-from flatsql.config import SETTINGS_PATH
+from flatsql.config import HISTORY_DB_PATH
 
 
 class HistoryManager:
@@ -14,9 +13,7 @@ class HistoryManager:
 
     def __init__(self) -> None:
         """Initialize the history database connection and schema."""
-        # Store the db in the same folder as settings.json
-        db_dir = os.path.dirname(SETTINGS_PATH)
-        self.db_path = os.path.join(db_dir, "userdata.duckdb")
+        self.db_path = HISTORY_DB_PATH
         self.con = duckdb.connect(self.db_path)
         self._init_db()
 
