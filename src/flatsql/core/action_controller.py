@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QFileDialog, Q
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 
-from flatsql.config import SNIPPETS_DIR, BASE_DIR
+from flatsql.config import SNIPPETS_DIR, LOG_PATH
 from flatsql.core.path_utils import to_duckdb_path, to_duckdb_relation
 from flatsql.core.sql_generator import SQLGenerator
 from flatsql.core.exporter import DataExporter
@@ -609,11 +609,10 @@ class ActionController:
 
     def open_logs(self) -> None:
         """Open the FlatSQL Studio log file in the default text editor."""
-        log_path = os.path.join(BASE_DIR, "flatsql.log")
-        if os.path.exists(log_path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(log_path))
+        if os.path.exists(LOG_PATH):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(LOG_PATH))
         else:
-            QMessageBox.information(self.mw, "No Log File", f"Log file not found at {log_path}")
+            QMessageBox.information(self.mw, "No Log File", f"Log file not found at {LOG_PATH}")
 
     def change_active_tab_connection(self, index: int) -> None:
         """Updates the active editor's connection when the user changes the dropdown."""

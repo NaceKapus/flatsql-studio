@@ -7,10 +7,9 @@ import os
 from logging.handlers import RotatingFileHandler
 from typing import Final
 
-from flatsql.config import SETTINGS_PATH
+from flatsql.config import LOG_PATH, USER_DATA_DIR
 
 _LOGGER_NAME: Final[str] = "flatsql"
-_LOG_FILE_NAME: Final[str] = "flatsql.log"
 _MAX_LOG_BYTES: Final[int] = 1_048_576
 _BACKUP_COUNT: Final[int] = 5
 
@@ -25,12 +24,12 @@ def _normalize_logger_name(name: str) -> str:
 
 def _get_log_directory() -> str:
     """Return the directory used for persistent FlatSQL Studio log files."""
-    return os.path.dirname(SETTINGS_PATH)
+    return USER_DATA_DIR
 
 
 def _get_log_file_path() -> str:
     """Return the full path to the FlatSQL Studio log file."""
-    return os.path.join(_get_log_directory(), _LOG_FILE_NAME)
+    return LOG_PATH
 
 
 def configure_logging(level: int = logging.INFO) -> logging.Logger:
