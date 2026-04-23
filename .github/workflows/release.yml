@@ -44,6 +44,7 @@ jobs:
             --name "FlatSQL-Studio" \
             --icon "src/flatsql/assets/img/icon.ico" \
             --add-data "src/flatsql/assets;assets" \
+            --paths src \
             run.py
 
       - name: Build (macOS)
@@ -53,6 +54,7 @@ jobs:
             --windowed \
             --name "FlatSQL Studio" \
             --add-data "src/flatsql/assets:assets" \
+            --paths src \
             run.py
 
       - name: Collect Windows artifact
