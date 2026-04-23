@@ -9,3 +9,6 @@ __pycache__/
 # Ignore per-user application state
 settings.json
 snippets/
+
+# Ignore .claude folder
+.claude/

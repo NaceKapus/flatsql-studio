@@ -1,0 +1,90 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.2.0) — must already exist on the repo'
+        required: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: FlatSQL-Studio-Windows.exe
+          - os: macos-latest
+            artifact: FlatSQL-Studio-macOS.zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          pyinstaller \
+            --onefile \
+            --windowed \
+            --name "FlatSQL-Studio" \
+            --icon "src/flatsql/assets/img/icon.ico" \
+            --add-data "src/flatsql/assets;assets" \
+            run.py
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller \
+            --windowed \
+            --name "FlatSQL Studio" \
+            --add-data "src/flatsql/assets:assets" \
+            run.py
+
+      - name: Collect Windows artifact
+        if: runner.os == 'Windows'
+        shell: bash
+        run: mv "dist/FlatSQL-Studio.exe" "FlatSQL-Studio-Windows.exe"
+
+      - name: Collect macOS artifact
+        if: runner.os == 'macOS'
+        run: |
+          cd dist && zip -r "../FlatSQL-Studio-macOS.zip" "FlatSQL Studio.app"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: |
+            FlatSQL-Studio-Windows.exe
+            FlatSQL-Studio-macOS.zip
+          generate_release_notes: true
