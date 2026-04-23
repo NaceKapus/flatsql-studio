@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 
 import polars as pl
 from PySide6.QtGui import QFontDatabase, QFont
@@ -35,7 +36,7 @@ class DataViewerDialog(QDialog):
         self.text_edit.setReadOnly(True)
 
         # Use a monospace font for structured data
-        if os.name == "nt":
+        if sys.platform == 'win32':
             font = QFont("Consolas")
         else:
             font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
