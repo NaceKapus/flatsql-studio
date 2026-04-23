@@ -6,8 +6,6 @@ A full-featured GUI SQL IDE built for the DuckDB-native workflow.
 
 ![FlatSQL Studio](./flatsql-studio.png)
 
-> **Platform support:** Windows only for now. macOS support is planned.
-
 ## Key Features
 
 - DuckDB-powered SQL execution.
@@ -28,6 +26,15 @@ A full-featured GUI SQL IDE built for the DuckDB-native workflow.
 
 ## Installation
 
+### Download (recommended)
+
+Download the latest release from the [Releases](../../releases/latest) page:
+
+- **Windows** — run `FlatSQL-Studio-Windows.exe` directly, no install needed.
+- **macOS** — unzip `FlatSQL-Studio-macOS.zip` and move `FlatSQL Studio.app` to your Applications folder. On first launch, right-click → Open to bypass the Gatekeeper warning (the app is not yet signed).
+
+### Run from source
+
 ```bash
 pip install -r requirements.txt
 python run.py
@@ -47,7 +54,6 @@ FlatSQL Studio is licensed under the MIT License. See [LICENSE](LICENSE) for det
 
 ## Roadmap
 
-- macOS support.
 - Additional connectors (AWS, GCP, and more).
 - Built-in Delta support.
 - Additional database explorer functionality.
