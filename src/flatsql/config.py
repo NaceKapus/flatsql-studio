@@ -12,7 +12,12 @@ from PySide6.QtWidgets import QApplication
 APP_NAME = "FlatSQL Studio"
 
 # Read-only assets shipped with the install (src/flatsql/assets/...)
-_PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller --onefile extracts files to sys._MEIPASS at runtime with
+# --add-data placing assets/ directly under that root.
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    _PKG_DIR = sys._MEIPASS
+else:
+    _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(_PKG_DIR, "assets")
 THEMES_DIR = os.path.join(ASSETS_DIR, "themes")
 SQLFLUFF_CONFIG_PATH = os.path.join(ASSETS_DIR, ".sqlfluff")
