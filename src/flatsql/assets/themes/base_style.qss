@@ -7,11 +7,14 @@ QWidget {
 }
 
 /* Generic Frame Styles (Explorer, Query, Results) */
-QFrame#file_explorer_frame, 
-QFrame#db_explorer_frame, 
-QFrame#query_frame, 
+QFrame#file_explorer_frame,
+QFrame#db_explorer_frame,
 QFrame#results_frame {
-    border: none; /* Remove frame borders for a cleaner "seamless" look */
+    border: none;
+}
+
+QFrame#query_frame {
+    border: none;
 }
 
 /* =======================================================
@@ -102,6 +105,15 @@ QPushButton:hover {
     background-color: palette(alternate-base);
 }
 
+QPushButton:pressed {
+    background-color: palette(mid);
+}
+
+QPushButton:focus {
+    border-color: palette(highlight);
+    outline: none;
+}
+
 /* Toolbar Container */
 #queryToolbar {
     padding: 4px;
@@ -117,6 +129,10 @@ QPushButton:hover {
     border-radius: 4px;
     padding: 6px;
     margin: 0px 2px;
+}
+
+#queryToolbar QPushButton:pressed {
+    background-color: palette(mid);
 }
 
 /* =======================================================
@@ -179,11 +195,11 @@ QTreeView, QTableView {
 }
 
 QTreeView::item {
-    padding: 2px 4px; 
+    padding: 2px 4px;
 }
 
 QTableView::item {
-    padding: 1px 4px; 
+    padding: 2px 4px;
 }
 
 /* --- Modern Header Styling --- */
@@ -232,7 +248,7 @@ QToolButton#queryTabCloseButton {
 QFrame#queryEmptyStateCard {
     border-width: 2px;
     border-style: dashed;
-    border-color: palette(text);
+    border-color: palette(mid);
     border-radius: 14px;
     background-color: transparent;
 }
@@ -254,19 +270,113 @@ QPushButton#queryEmptyStateSecondaryButton {
     min-width: 120px;
 }
 
-QListWidget#dropZoneList::item,
-QListWidget#dragSourceList::item {
-    padding: 6px 8px;
-    margin: 3px 2px;
-    min-height: 18px;
-    border-radius: 4px;
+/* =======================================================
+   10. Visualize Dialog
+   ======================================================= */
+
+QFrame#fieldPanel, QFrame#settingsPanel {
+    background-color: palette(base);
+    border: 1px solid palette(mid);
+    border-radius: 8px;
 }
 
-QListWidget#dropZoneList::item:hover,
-QListWidget#dragSourceList::item:hover {
+QLabel#sectionHeader {
+    color: palette(placeholder-text);
+    font-size: 10px;
+    font-weight: bold;
 }
 
 QLabel#slicerInfoLabel {
+    color: palette(placeholder-text);
+    font-style: italic;
+}
+
+QListWidget#dragSourceList {
+    border: none;
+    background: transparent;
+}
+
+QListWidget#dragSourceList::item {
+    border-radius: 4px;
+    padding: 2px 4px;
+    margin: 1px 0px;
+}
+
+QListWidget#dragSourceList::item:hover {
+    background-color: palette(alternate-base);
+}
+
+QListWidget#dragSourceList::item:selected {
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+}
+
+QListWidget#dropZoneList {
+    border: 2px dashed palette(mid);
+    border-radius: 6px;
+    background: transparent;
+}
+
+QListWidget#dropZoneList[dragOver="true"] {
+    border: 2px solid palette(highlight);
+}
+
+QListWidget#dropZoneList::item {
+    background-color: palette(alternate-base);
+    border: 1px solid palette(mid);
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin: 1px 2px;
+}
+
+QListWidget#dropZoneList::item:selected {
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+    border-color: palette(highlight);
+}
+
+QPushButton#chartTypeBtnLeft {
+    border: 1px solid palette(mid);
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0px;
+    border-bottom-right-radius: 0px;
+    padding: 5px 14px;
+    background: transparent;
+}
+
+QPushButton#chartTypeBtnMid {
+    border-top: 1px solid palette(mid);
+    border-bottom: 1px solid palette(mid);
+    border-left: none;
+    border-right: none;
+    border-radius: 0px;
+    padding: 5px 14px;
+    background: transparent;
+}
+
+QPushButton#chartTypeBtnRight {
+    border: 1px solid palette(mid);
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    border-top-left-radius: 0px;
+    border-bottom-left-radius: 0px;
+    padding: 5px 14px;
+    background: transparent;
+}
+
+QPushButton#chartTypeBtnLeft:checked,
+QPushButton#chartTypeBtnMid:checked,
+QPushButton#chartTypeBtnRight:checked {
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+    border-color: palette(highlight);
+}
+
+QPushButton#chartTypeBtnLeft:hover:!checked,
+QPushButton#chartTypeBtnMid:hover:!checked,
+QPushButton#chartTypeBtnRight:hover:!checked {
+    background-color: palette(alternate-base);
 }
 
 QFrame#profileCard {
@@ -296,7 +406,11 @@ QProgressBar#profileNullBar[severity="high"]::chunk {
 QSplitter::handle {
     width: 4px;
     height: 4px;
-    background: palette(mid);
+    background: transparent;
+}
+
+QSplitter::handle:hover {
+    background: palette(highlight);
 }
 
 /* =======================================================
@@ -313,6 +427,10 @@ QLineEdit {
     color: palette(text);
     selection-background-color: palette(highlight);
     selection-color: palette(highlighted-text);
+}
+
+QLineEdit:focus {
+    border-color: palette(highlight);
 }
 
 #findReplaceWidget {
@@ -334,6 +452,11 @@ QCheckBox::indicator {
     border-style: solid;
     border-color: palette(mid);
     background-color: palette(base);
+}
+
+QCheckBox::indicator:checked {
+    background-color: palette(highlight);
+    border-color: palette(highlight);
 }
 
 /* =======================================================
