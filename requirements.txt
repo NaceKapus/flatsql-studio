@@ -8,3 +8,4 @@ keyring>=25.0.0
 requests>=2.31.0
 matplotlib>=3.8.0
 xlsxwriter>=3.2.0
+platformdirs>=4.0

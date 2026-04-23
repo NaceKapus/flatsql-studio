@@ -5,24 +5,34 @@ import os
 import sys
 import ctypes
 
+from platformdirs import user_data_dir
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-# Get the base directory of the project (where run.py is)
-# File is at src/flatsql/config.py, so go up 3 levels to reach root
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+APP_NAME = "FlatSQL Studio"
 
-# Assets is now in src/flatsql/assets (1 level up from config.py, same directory)
-ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+# Read-only assets shipped with the install (src/flatsql/assets/...)
+_PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+ASSETS_DIR = os.path.join(_PKG_DIR, "assets")
 THEMES_DIR = os.path.join(ASSETS_DIR, "themes")
+SQLFLUFF_CONFIG_PATH = os.path.join(ASSETS_DIR, ".sqlfluff")
 TEMPLATES_DIR = os.path.join(ASSETS_DIR, "templates")
-SETTINGS_PATH = os.path.join(BASE_DIR, "settings.json")
-SNIPPETS_DIR = os.path.join(BASE_DIR, "snippets")
 BUILTIN_SNIPPETS_SOURCE_DIR = os.path.join(TEMPLATES_DIR, "snippets")
 BUILTIN_SNIPPETS_FOLDER_NAME = "DuckDB"
-SQLFLUFF_CONFIG_PATH = os.path.join(BASE_DIR, ".sqlfluff")
-DOCS_URL = "https://docs.flatsql.com"
 
+# User-writable per-user data directory (platform-native, survives reinstalls).
+#   Windows: %APPDATA%\FlatSQL\FlatSQL Studio\
+#   macOS:   ~/Library/Application Support/FlatSQL Studio/
+#   Linux:   $XDG_DATA_HOME or ~/.local/share/FlatSQL Studio/
+USER_DATA_DIR = user_data_dir(APP_NAME, appauthor=False, roaming=True)
+SETTINGS_PATH = os.path.join(USER_DATA_DIR, "settings.json")
+SNIPPETS_DIR = os.path.join(USER_DATA_DIR, "snippets")
+LOG_PATH = os.path.join(USER_DATA_DIR, "flatsql.log")
+HISTORY_DB_PATH = os.path.join(USER_DATA_DIR, "userdata.duckdb")
+
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+
+DOCS_URL = "https://docs.flatsql.com"
 APP_VERSION = "1.0.0"
 
 

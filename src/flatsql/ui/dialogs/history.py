@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontDatabase, QFont
@@ -83,7 +84,7 @@ class HistoryDialog(QDialog):
 
         self.preview_editor = QPlainTextEdit()
         self.preview_editor.setReadOnly(True)
-        if os.name == "nt":
+        if sys.platform == 'win32':
             font = QFont("Consolas")
         else:
             font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
