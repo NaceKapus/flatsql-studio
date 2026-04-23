@@ -10,11 +10,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 APP_NAME = "FlatSQL Studio"
-APP_AUTHOR = "FlatSQL"
 
 # Read-only assets shipped with the install (src/flatsql/assets/...)
-ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+_PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+ASSETS_DIR = os.path.join(_PKG_DIR, "assets")
 THEMES_DIR = os.path.join(ASSETS_DIR, "themes")
+SQLFLUFF_CONFIG_PATH = os.path.join(ASSETS_DIR, ".sqlfluff")
 TEMPLATES_DIR = os.path.join(ASSETS_DIR, "templates")
 BUILTIN_SNIPPETS_SOURCE_DIR = os.path.join(TEMPLATES_DIR, "snippets")
 BUILTIN_SNIPPETS_FOLDER_NAME = "DuckDB"
@@ -23,7 +24,7 @@ BUILTIN_SNIPPETS_FOLDER_NAME = "DuckDB"
 #   Windows: %APPDATA%\FlatSQL\FlatSQL Studio\
 #   macOS:   ~/Library/Application Support/FlatSQL Studio/
 #   Linux:   $XDG_DATA_HOME or ~/.local/share/FlatSQL Studio/
-USER_DATA_DIR = user_data_dir(APP_NAME, APP_AUTHOR, roaming=True)
+USER_DATA_DIR = user_data_dir(APP_NAME, appauthor=False, roaming=True)
 SETTINGS_PATH = os.path.join(USER_DATA_DIR, "settings.json")
 SNIPPETS_DIR = os.path.join(USER_DATA_DIR, "snippets")
 LOG_PATH = os.path.join(USER_DATA_DIR, "flatsql.log")

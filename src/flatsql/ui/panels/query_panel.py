@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from typing import Any
 
 import qtawesome as qta
@@ -239,7 +240,7 @@ class QueryPanel(QFrame):
         db_functions = getattr(main_win, 'db_functions', [])
         editor.highlighter = SqlHighlighter(editor.document(), db_keywords, db_functions, theme_colors=syntax_colors)
 
-        if os.name == 'nt':
+        if sys.platform == 'win32':
             font = QFont('Consolas')
         else:
             font = QFontDatabase.systemFont(QFontDatabase.FixedFont)

@@ -87,6 +87,16 @@ class LocalFileSystemConnector(FileSystemConnector):
                             drives.append((display_name, 'directory', drive_path))
                         bitmask >>= 1
                     return drives
+                elif sys.platform == 'darwin':
+                    entries: list[FileListing] = []
+                    home = os.path.expanduser('~')
+                    entries.append((os.path.basename(home), 'directory', home))
+                    volumes_dir = '/Volumes'
+                    if os.path.isdir(volumes_dir):
+                        for vol in sorted(os.listdir(volumes_dir)):
+                            if not vol.startswith('.'):
+                                entries.append((vol, 'directory', os.path.join(volumes_dir, vol)))
+                    return entries
                 else:
                     path = '/'
 
