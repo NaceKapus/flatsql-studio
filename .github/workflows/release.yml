@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact: FlatSQL-Studio-Windows.exe
+            artifact: FlatSQL-Studio-Windows-Setup.exe
           - os: macos-latest
             artifact: FlatSQL-Studio-macOS.zip
 
@@ -39,28 +39,40 @@ jobs:
         shell: bash
         run: |
           pyinstaller \
-            --onefile \
+            --noconfirm \
             --windowed \
             --name "FlatSQL-Studio" \
             --icon "src/flatsql/assets/img/icon.ico" \
             --add-data "src/flatsql/assets;assets" \
             --paths src \
+            --collect-all sqlfluff \
+            --collect-all pyarrow \
+            --collect-submodules duckdb \
             run.py
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: |
           pyinstaller \
+            --noconfirm \
             --windowed \
             --name "FlatSQL Studio" \
             --add-data "src/flatsql/assets:assets" \
             --paths src \
+            --collect-all sqlfluff \
+            --collect-all pyarrow \
+            --collect-submodules duckdb \
             run.py
+
+      - name: Build Windows installer (Inno Setup)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: '"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\FlatSQL-Studio.iss'
 
       - name: Collect Windows artifact
         if: runner.os == 'Windows'
         shell: bash
-        run: mv "dist/FlatSQL-Studio.exe" "FlatSQL-Studio-Windows.exe"
+        run: mv "packaging/windows/Output/FlatSQL-Studio-Setup.exe" "FlatSQL-Studio-Windows-Setup.exe"
 
       - name: Collect macOS artifact
         if: runner.os == 'macOS'
@@ -87,6 +99,6 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            FlatSQL-Studio-Windows.exe
+            FlatSQL-Studio-Windows-Setup.exe
             FlatSQL-Studio-macOS.zip
           generate_release_notes: true
