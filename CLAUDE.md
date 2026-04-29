@@ -46,7 +46,7 @@ These are non-negotiable conventions — violating them breaks the app's design 
 
 Two different path roots that often get confused:
 
-- **Read-only assets** (themes, `.sqlfluff`, templates, icons) are bundled by PyInstaller via `--add-data` and resolved through `sys._MEIPASS`. See [src/flatsql/config.py](src/flatsql/config.py): when frozen, `_PKG_DIR = sys._MEIPASS`; otherwise it falls back to the package directory. Use the `ASSETS_DIR`, `THEMES_DIR`, `SQLFLUFF_CONFIG_PATH`, etc. constants — never hardcode paths assuming the source-checkout layout.
+- **Read-only assets** (themes, templates, icons) are bundled by PyInstaller via `--add-data` and resolved through `sys._MEIPASS`. See [src/flatsql/config.py](src/flatsql/config.py): when frozen, `_PKG_DIR = sys._MEIPASS`; otherwise it falls back to the package directory. Use the `ASSETS_DIR`, `THEMES_DIR`, etc. constants — never hardcode paths assuming the source-checkout layout. The SQLFluff config is generated from user settings into `USER_SQLFLUFF_PATH` under the user data dir, not bundled.
 - **User-writable data** (settings, query history, snippets, logs) lives under `platformdirs.user_data_dir(APP_NAME)` → `%APPDATA%\FlatSQL\FlatSQL Studio\` on Windows, `~/Library/Application Support/FlatSQL Studio/` on macOS. Never write next to the executable.
 
 The Windows release produces a `--onedir` PyInstaller bundle wrapped in an Inno Setup installer ([packaging/windows/FlatSQL-Studio.iss](packaging/windows/FlatSQL-Studio.iss)); the macOS release produces a zipped `.app`. The `AppId` GUID in the Inno Setup script must remain stable across releases — changing it makes upgrades install side-by-side instead of in place.

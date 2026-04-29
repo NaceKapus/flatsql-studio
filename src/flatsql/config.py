@@ -20,7 +20,6 @@ else:
     _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(_PKG_DIR, "assets")
 THEMES_DIR = os.path.join(ASSETS_DIR, "themes")
-SQLFLUFF_CONFIG_PATH = os.path.join(ASSETS_DIR, ".sqlfluff")
 TEMPLATES_DIR = os.path.join(ASSETS_DIR, "templates")
 BUILTIN_SNIPPETS_SOURCE_DIR = os.path.join(TEMPLATES_DIR, "snippets")
 BUILTIN_SNIPPETS_FOLDER_NAME = "DuckDB"
@@ -34,6 +33,7 @@ SETTINGS_PATH = os.path.join(USER_DATA_DIR, "settings.json")
 SNIPPETS_DIR = os.path.join(USER_DATA_DIR, "snippets")
 LOG_PATH = os.path.join(USER_DATA_DIR, "flatsql.log")
 HISTORY_DB_PATH = os.path.join(USER_DATA_DIR, "userdata.duckdb")
+USER_SQLFLUFF_PATH = os.path.join(USER_DATA_DIR, "sqlfluff.cfg")
 
 os.makedirs(USER_DATA_DIR, exist_ok=True)
 
