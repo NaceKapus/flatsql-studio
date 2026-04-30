@@ -27,6 +27,7 @@ class ResultsPanel(QFrame):
     """Panel for displaying query results with grid, profiles, and messages."""
 
     export_requested = Signal()
+    copy_query_as_python_requested = Signal()
 
     def __init__(self, settings_manager: Any, parent: QWidget | None = None) -> None:
         """Initialize the results panel with settings manager.
@@ -348,17 +349,21 @@ class ResultsPanel(QFrame):
             menu.addSeparator()
             copy_markdown_action = menu.addAction("Copy as Markdown")
             copy_html_action = menu.addAction("Copy as HTML")
-            
+            menu.addSeparator()
+            copy_python_action = menu.addAction("Copy Query as Python script")
+
             action = menu.exec(self.results_view.viewport().mapToGlobal(point))
 
-            if action == copy_action: 
+            if action == copy_action:
                 self._copy_results(fmt='tsv', with_headers=False)
-            elif action == copy_headers_action: 
+            elif action == copy_headers_action:
                 self._copy_results(fmt='tsv', with_headers=True)
-            elif action == copy_markdown_action: 
+            elif action == copy_markdown_action:
                 self._copy_results(fmt='markdown', with_headers=True)
-            elif action == copy_html_action: 
+            elif action == copy_html_action:
                 self._copy_results(fmt='html', with_headers=True)
+            elif action == copy_python_action:
+                self.copy_query_as_python_requested.emit()
 
     def _copy_results(self, fmt: str = 'tsv', with_headers: bool = False) -> None:
         """Format and copy selected grid cells to clipboard.
