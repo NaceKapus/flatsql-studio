@@ -102,18 +102,32 @@ class SQLGenerator:
             )
 
     @staticmethod
+    def select_top_menu_label(limit: int, suffix: str = "") -> str:
+        """Return the user-facing menu label for a Select-Top action.
+
+        ``limit <= 0`` becomes "Select All Rows" since no cap is applied.
+        ``suffix`` (e.g. " from Folder") is appended to the base label.
+        """
+        if limit and limit > 0:
+            return f"Select Top {limit} Rows{suffix}"
+        return f"Select All Rows{suffix}"
+
+    @staticmethod
     def generate_select_top(column_list: list[str], from_clause: str, limit: int = 1000) -> str:
-        """Generate a SELECT TOP-style query with optional quoted column list."""
+        """Generate a SELECT TOP-style query with optional quoted column list.
+
+        ``limit <= 0`` omits the LIMIT clause entirely (no cap).
+        """
+        limit_clause = f"\nLIMIT {limit}" if limit and limit > 0 else ""
         if not column_list:
-            return f"SELECT *\nFROM {from_clause}\nLIMIT {limit};"
+            return f"SELECT *\nFROM {from_clause}{limit_clause};"
 
         quoted_columns = [f'"{col}"' for col in column_list]
         columns_str = ",\n\t".join(quoted_columns)
-        
+
         return (
             f"SELECT\n\t{columns_str}\n"
-            f"FROM {from_clause}\n"
-            f"LIMIT {limit};"
+            f"FROM {from_clause}{limit_clause};"
         )
 
     @staticmethod
@@ -122,9 +136,10 @@ class SQLGenerator:
         file_path: str,
         limit: int = 1000,
     ) -> str:
-        """
-        Generates a query that unnested STRUCT columns recursively.
+        """Generate a query that recursively unnests STRUCT columns.
+
         Schema is expected to be a list of tuples (name, type).
+        ``limit <= 0`` omits the LIMIT clause entirely (no cap).
         """
         column_expressions = []
         for name, col_type in schema:
@@ -135,11 +150,11 @@ class SQLGenerator:
 
         columns_str = ",\n\t".join(column_expressions)
         file_relation = to_duckdb_relation(file_path)
+        limit_clause = f"\nLIMIT {limit}" if limit and limit > 0 else ""
 
         return (
             f"SELECT\n\t{columns_str}\n"
-            f"FROM {file_relation}\n"
-            f"LIMIT {limit};"
+            f"FROM {file_relation}{limit_clause};"
         )
 
     @staticmethod

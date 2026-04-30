@@ -227,6 +227,20 @@ class SettingsDialog(QDialog):
 
         layout.addRow("History Retention Limit:", self.history_limit_input)
 
+        self.preview_row_limit_spin = QSpinBox()
+        self.preview_row_limit_spin.setRange(0, 10_000_000)
+        self.preview_row_limit_spin.setSingleStep(1000)
+        self.preview_row_limit_spin.setSuffix(" rows")
+        self.preview_row_limit_spin.setSpecialValueText("Unlimited")
+        self.preview_row_limit_spin.setValue(
+            int(self.settings_data.get("preview_row_limit", 1000) or 0)
+        )
+        self.preview_row_limit_spin.setToolTip(
+            "Maximum rows shown by Select Top, file previews, and history "
+            "previews. Set to 0 for no cap."
+        )
+        layout.addRow("Preview Row Limit:", self.preview_row_limit_spin)
+
         main_layout.addLayout(layout)
         main_layout.addStretch()
 
@@ -602,6 +616,7 @@ class SettingsDialog(QDialog):
             "csv_delimiter": self.default_delimiter_combo.currentData(),
             "csv_include_header": self.default_header_check.isChecked(),
             "history_retention_limit": retention_limit,
+            "preview_row_limit": self.preview_row_limit_spin.value(),
             "engine_max_memory": self.max_memory_input.text().strip(),
             "engine_temp_dir": self.temp_dir_input.text().strip(),
             "engine_max_spill_size": self.max_spill_input.text().strip(),

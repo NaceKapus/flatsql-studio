@@ -37,6 +37,17 @@ class ActionController:
     def format_sql_string(self, sql_string: str) -> str:
         return self.mw.sql_formatter.format(sql_string)
 
+    def _preview_row_limit(self) -> int:
+        """Return the user-configured row cap for preview-style queries.
+
+        ``0`` (or any non-positive value) means no cap — callers must skip
+        emitting a ``LIMIT`` clause in that case.
+        """
+        try:
+            return int(self.mw.settings_manager.get('preview_row_limit', 1000))
+        except (TypeError, ValueError):
+            return 1000
+
     @staticmethod
     def _sanitize_snippet_name(name: str) -> str:
         """Return a filesystem-safe snippet name."""
@@ -146,9 +157,11 @@ class ActionController:
                 db_path = self.mw.history_manager.db_path
                 if db_path not in self.mw.conn_manager.db_connections:
                     self.mw.conn_manager.add_db_connection(db_path)
+                limit = self._preview_row_limit()
+                limit_clause = f"\nLIMIT {limit}" if limit > 0 else ""
                 query = (
                     "SELECT\n    \"timestamp\",\n    \"duration\",\n    \"rows\",\n    \"query\"\n"
-                    "FROM \"flatsql\".\"query_history\"\nORDER BY \"timestamp\" DESC\nLIMIT 1000;"
+                    f"FROM \"flatsql\".\"query_history\"\nORDER BY \"timestamp\" DESC{limit_clause};"
                 )
                 self.mw.query_panel.add_new_tab(content=query, tab_name="History Table", connection_key=db_path)
                 self.execute_query()
@@ -242,8 +255,8 @@ class ActionController:
         
         cols_with_types = engine.get_columns_for_object(schema, name)
         columns = [col[0] for col in cols_with_types]
-        
-        query_raw = SQLGenerator.generate_select_top(columns, from_clause)
+
+        query_raw = SQLGenerator.generate_select_top(columns, from_clause, self._preview_row_limit())
         query = self.format_sql_string(query_raw)
         
         self.mw.query_panel.add_new_tab(content=query, tab_name=f"SELECT_{name}", connection_key=connection_key)
@@ -362,7 +375,7 @@ class ActionController:
             if editor: editor.setPlainText("-- Error: Could not determine schema.")
             QMessageBox.warning(self.mw, "Schema Error", f"Could not determine the schema for {file_name}.")
             return
-        query = SQLGenerator.generate_flattened_select(schema, file_path)
+        query = SQLGenerator.generate_flattened_select(schema, file_path, self._preview_row_limit())
         formatted_query = self.format_sql_string(query)
         if editor: editor.setPlainText(formatted_query)
         self.execute_query()
@@ -403,9 +416,9 @@ class ActionController:
                 columns = [col[0] for col in cols_with_types]
                 from_clause = f'"{schema_name}"."{object_name}"'
 
-        query = SQLGenerator.generate_select_top(columns, from_clause)
+        query = SQLGenerator.generate_select_top(columns, from_clause, self._preview_row_limit())
         formatted_query = self.format_sql_string(query)
-        
+
         if editor: editor.setPlainText(formatted_query)
         self.execute_query()
 
@@ -448,8 +461,13 @@ class ActionController:
             full_path_glob = f"{folder_sql}/{wildcard}"
         else:
             full_path_glob = f"{folder_sql}/**/{wildcard}"
+        limit = self._preview_row_limit()
+        limit_clause = f" LIMIT {limit}" if limit > 0 else ""
         self.create_and_run_query_for_file(
-            full_path_glob, folder_name, "SELECT * FROM {file_relation} LIMIT 1000;", "{file_name}"
+            full_path_glob,
+            folder_name,
+            "SELECT * FROM {file_relation}" + limit_clause + ";",
+            "{file_name}",
         )
 
     def show_schema(self, fp: str, fn: str) -> None:

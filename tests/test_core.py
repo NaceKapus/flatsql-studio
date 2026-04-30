@@ -305,6 +305,21 @@ class TestSettingsManager:
                 # Falls back to defaults
                 assert manager.get("font_size") == 11
 
+    def test_preview_row_limit_default(self, tmp_settings) -> None:
+        manager, _ = tmp_settings
+        assert manager.get("preview_row_limit") == 1000
+
+    def test_preview_row_limit_roundtrip(self, tmp_settings) -> None:
+        manager, settings_file = tmp_settings
+        manager.set("preview_row_limit", 25000)
+        manager.save()
+
+        with patch("flatsql.core.settings.SETTINGS_PATH", str(settings_file)):
+            with patch("flatsql.config.SETTINGS_PATH", str(settings_file)):
+                from flatsql.core.settings import SettingsManager
+                reloaded = SettingsManager()
+                assert reloaded.get("preview_row_limit") == 25000
+
 
 # ---------------------------------------------------------------------------
 # HistoryManager
@@ -401,6 +416,61 @@ class TestSQLGeneratorSelectTop:
 
         sql = SQLGenerator.generate_select_top(["id"], "t")
         assert "LIMIT 1000" in sql
+
+    def test_zero_limit_omits_clause(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+
+        sql = SQLGenerator.generate_select_top(["id"], "t", limit=0)
+        assert "LIMIT" not in sql
+        assert sql.endswith(";")
+        assert '"id"' in sql
+
+    def test_zero_limit_with_star(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+
+        sql = SQLGenerator.generate_select_top([], "t", limit=0)
+        assert "LIMIT" not in sql
+        assert "SELECT *" in sql
+
+    def test_negative_limit_omits_clause(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+
+        sql = SQLGenerator.generate_select_top(["id"], "t", limit=-5)
+        assert "LIMIT" not in sql
+
+
+class TestSelectTopMenuLabel:
+    """select_top_menu_label produces the right user-facing text per limit."""
+
+    def test_positive_limit(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+        assert SQLGenerator.select_top_menu_label(1000) == "Select Top 1000 Rows"
+
+    def test_custom_positive_limit(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+        assert SQLGenerator.select_top_menu_label(25000) == "Select Top 25000 Rows"
+
+    def test_zero_limit_means_all_rows(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+        assert SQLGenerator.select_top_menu_label(0) == "Select All Rows"
+
+    def test_negative_limit_means_all_rows(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+        assert SQLGenerator.select_top_menu_label(-1) == "Select All Rows"
+
+    def test_suffix_is_appended(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+        assert (
+            SQLGenerator.select_top_menu_label(5000, " from Folder")
+            == "Select Top 5000 Rows from Folder"
+        )
+
+    def test_suffix_with_unlimited(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+        assert (
+            SQLGenerator.select_top_menu_label(0, " from Folder")
+            == "Select All Rows from Folder"
+        )
 
 
 class TestThemeDefinitions:
@@ -768,6 +838,14 @@ class TestSQLGeneratorFlattenedSelect:
         sql = SQLGenerator.generate_flattened_select([], "C:\\data\\file.parquet", limit=500)
         assert "C:/data/file.parquet" in sql
         assert "LIMIT 500" in sql
+
+    def test_zero_limit_omits_clause(self) -> None:
+        from flatsql.core.sql_generator import SQLGenerator
+
+        schema = [("id", "INTEGER")]
+        sql = SQLGenerator.generate_flattened_select(schema, "/data/file.parquet", limit=0)
+        assert "LIMIT" not in sql
+        assert sql.endswith(";")
 
 
 class TestSQLGeneratorConversion:

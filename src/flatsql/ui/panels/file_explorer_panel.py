@@ -58,12 +58,19 @@ class FileExplorerPanel(QFrame):
         self.file_system_connections = file_system_connections
         self.get_active_engine_func = get_active_engine_func
         self.icon_provider = QFileIconProvider()
-        
+
         self.setObjectName("file_explorer_frame")
         self.setFrameShape(QFrame.StyledPanel)
         self.layout = QVBoxLayout(self)
 
         self._setup_ui()
+
+    def _preview_row_limit(self) -> int:
+        """Read the current preview-row-limit setting; ``0`` means no cap."""
+        try:
+            return int(self.settings_manager.get('preview_row_limit', 1000))
+        except (TypeError, ValueError):
+            return 1000
 
     def _setup_ui(self) -> None:
         """Set up the UI with header and tree view."""
@@ -489,12 +496,13 @@ class FileExplorerPanel(QFrame):
 
         if not is_connection and not is_favorites_root:
             if not is_expandable:
+                preview_label = SQLGenerator.select_top_menu_label(self._preview_row_limit())
                 if full_path and full_path.lower().endswith((".json", ".jsonl", ".ndjson")):
-                    select_menu = menu.addMenu("Select Top 1000 Rows")
+                    select_menu = menu.addMenu(preview_label)
                     actions[select_menu.addAction("Standard")] = lambda: self.action_script_select.emit(full_path, display_name, True)
                     actions[select_menu.addAction("Flattened")] = lambda: self.action_script_flattened.emit(full_path, display_name)
                 else:
-                    actions[menu.addAction("Select Top 1000 Rows")] = lambda: self.action_script_select.emit(full_path, display_name, True)
+                    actions[menu.addAction(preview_label)] = lambda: self.action_script_select.emit(full_path, display_name, True)
                     
                 actions[menu.addAction("Show Schema")] = lambda: self.action_show_schema.emit(full_path, display_name)
                 actions[menu.addAction("Show Stats")] = lambda: self.action_show_stats.emit(full_path, display_name)
@@ -523,7 +531,9 @@ class FileExplorerPanel(QFrame):
                 if is_queryable_folder:
                     actions[menu.addAction("Merge Files in Folder")] = lambda: self.action_merge_folder.emit(full_path, display_name)
                     menu.addSeparator()
-                    select_folder_menu = menu.addMenu("Select Top 1000 Rows from Folder")
+                    select_folder_menu = menu.addMenu(
+                        SQLGenerator.select_top_menu_label(self._preview_row_limit(), " from Folder")
+                    )
                     actions[select_folder_menu.addAction("CSV Files (*.csv)")] = lambda: self.action_select_folder.emit(full_path, display_name, "*.csv")
                     actions[select_folder_menu.addAction("TSV Files (*.tsv)")] = lambda: self.action_select_folder.emit(full_path, display_name, "*.tsv")
                     actions[select_folder_menu.addAction("TAB Files (*.tab)")] = lambda: self.action_select_folder.emit(full_path, display_name, "*.tab")

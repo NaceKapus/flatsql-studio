@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from flatsql.core.sql_generator import SQLGenerator
 from flatsql.ui.widgets import DownwardComboBox, ExplorerTreeView
 
 
@@ -53,6 +54,13 @@ class DBExplorerPanel(QFrame):
         self.layout = QVBoxLayout(self)
 
         self._setup_ui()
+
+    def _preview_row_limit(self) -> int:
+        """Read the current preview-row-limit setting; ``0`` means no cap."""
+        try:
+            return int(self.settings_manager.get('preview_row_limit', 1000))
+        except (TypeError, ValueError):
+            return 1000
 
     def _setup_ui(self) -> None:
         """Create the explorer header and tree view."""
@@ -424,7 +432,9 @@ class DBExplorerPanel(QFrame):
             if not object_type:
                 return
 
-            select_action = menu.addAction("Select Top 1000 Rows")
+            select_action = menu.addAction(
+                SQLGenerator.select_top_menu_label(self._preview_row_limit())
+            )
             menu.addSeparator()
             script_as_menu = menu.addMenu("Script As")
             create_action = script_as_menu.addAction("CREATE")
