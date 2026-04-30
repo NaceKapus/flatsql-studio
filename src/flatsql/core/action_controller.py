@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import os
 from typing import Any
 
@@ -57,6 +58,66 @@ class ActionController:
     def stop_query(self) -> None:
         """Request cancellation of the currently running query."""
         self.mw.query_controller.stop_query()
+
+    def copy_query_as_python_script(self) -> None:
+        """Copy a self-contained DuckDB Python reproducer for the active editor's last query."""
+        status = self.mw.results_panel.status_message_label
+        editor = self.mw.query_panel.get_active_editor()
+        if not editor:
+            status.setText("No active query tab.")
+            return
+
+        query = (getattr(editor, 'last_executed_query', '') or '').strip()
+        if not query:
+            status.setText("Run a query first, then copy it as Python.")
+            return
+
+        conn_key = getattr(editor, 'connection_key', None)
+        if conn_key and conn_key.startswith("databricks_"):
+            status.setText("Copy as Python is not yet supported for Databricks connections.")
+            return
+
+        engine = self.mw.conn_manager.get_db(conn_key) if conn_key else None
+        if engine is None:
+            status.setText("This editor has no active connection.")
+            return
+
+        script = self._build_python_reproducer(engine, query, conn_key or "")
+        QApplication.clipboard().setText(script)
+        status.setText("Copied query as Python script.")
+
+    @staticmethod
+    def _build_python_reproducer(engine: Any, query: str, conn_key: str) -> str:
+        """Return a self-contained Python script that reproduces ``query`` against ``engine``."""
+        is_temp = bool(getattr(engine, 'is_temp_db', False))
+        if is_temp:
+            connect_arg = '":memory:"'
+            note = (
+                "# NOTE: this script connects to a fresh in-memory DuckDB. Any session-only\n"
+                "# state from FlatSQL Studio (CREATE TABLE, ATTACH, registered views) is not\n"
+                "# replayed here — adapt the script if your query depends on it.\n"
+            )
+        else:
+            connect_arg = 'r"' + str(getattr(engine, 'db_name', '')) + '"'
+            note = ""
+
+        safe_query = query.replace('"""', '\\"\\"\\"')
+        timestamp = _dt.datetime.now().isoformat(timespec='seconds')
+
+        return (
+            '"""FlatSQL Studio - reproducer script.\n\n'
+            f'Generated: {timestamp}\n'
+            f'Connection: {conn_key}\n'
+            '"""\n'
+            f'{note}'
+            'import duckdb\n\n'
+            f'con = duckdb.connect({connect_arg})\n\n'
+            'query = """\\\n'
+            f'{safe_query}\n'
+            '"""\n\n'
+            'result = con.sql(query)\n'
+            'print(result.pl())  # use .df() for pandas, .arrow() for Arrow, .fetchall() for tuples\n'
+        )
 
     def open_new_query_for_connection(self, connection_key: str) -> None:
         """Open a blank query tab already bound to the selected connection."""
