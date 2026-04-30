@@ -222,6 +222,7 @@ class MainWindow(QMainWindow):
         self.query_panel.show_message_requested.connect(lambda msg: [self.results_panel.messages_view.setText(msg), self.results_panel.results_tabs.setCurrentIndex(1)])
         
         self.results_panel.export_requested.connect(self.action_controller.show_export_dialog)
+        self.results_panel.copy_query_as_python_requested.connect(self.action_controller.copy_query_as_python_script)
 
     def _apply_initial_splitter_sizes(self) -> None:
         """Apply DPI-friendly default splitter sizes after the window is shown."""
