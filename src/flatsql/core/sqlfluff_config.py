@@ -34,6 +34,7 @@ def render_sqlfluff_config(settings: Mapping[str, Any]) -> str:
     max_line_length = int(settings.get('sqlfluff_max_line_length', 80))
     comma_position = settings.get('sqlfluff_comma_position', 'trailing')
     require_semicolon = bool(settings.get('sqlfluff_require_semicolon', False))
+    quote_identifiers = bool(settings.get('sqlfluff_quote_identifiers', True))
 
     # Note: do not write a `rules = ...` whitelist here. The high-level
     # ``sqlfluff.fix`` API silently drops patches when a whitelist is present,
@@ -71,6 +72,12 @@ def render_sqlfluff_config(settings: Mapping[str, Any]) -> str:
         "",
         "[sqlfluff:rules:convention.terminator]",
         f"require_final_semicolon = {require_semicolon}",
+        "",
+        # references.quoting (RF06) reports missing quotes when this flag is on,
+        # but does not auto-fix. SQLFormatter reads the flag and post-processes
+        # the lint output to actually add the quotes.
+        "[sqlfluff:rules:references.quoting]",
+        f"prefer_quoted_identifiers = {quote_identifiers}",
         "",
     ]
     return "\n".join(lines)
