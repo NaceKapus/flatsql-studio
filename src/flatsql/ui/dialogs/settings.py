@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QKeySequenceEdit,
     QLabel,
@@ -70,7 +71,7 @@ class SettingsDialog(QDialog):
         # --- Sidebar (Left) ---
         self.pages_list = QListWidget()
         self.pages_list.setObjectName("settingsNav")
-        sidebar_width = max(170, self.fontMetrics().horizontalAdvance("Query Editor") + 64)
+        sidebar_width = max(170, self.fontMetrics().horizontalAdvance("SQL Formatting") + 64)
         self.pages_list.setMinimumWidth(sidebar_width)
         self.pages_list.setMaximumWidth(sidebar_width + 40)
         self.pages_list.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
@@ -99,6 +100,7 @@ class SettingsDialog(QDialog):
         """Create and add all settings pages to the stacked widget."""
         self.add_page("Appearance", self._create_appearance_tab())
         self.add_page("Query Editor", self._create_editor_tab())
+        self.add_page("SQL Formatting", self._create_formatting_tab())
         self.add_page("Export", self._create_export_tab())
         self.add_page("DuckDB", self._create_engine_tab())
         self.add_page("General", self._create_general_tab())
@@ -230,9 +232,202 @@ class SettingsDialog(QDialog):
 
         return widget
 
+    # Defaults for the SQL Formatting page. Kept in sync with DEFAULT_SETTINGS
+    # in core/settings.py. The "Reset to defaults" button reads from this map.
+    _SQLFLUFF_DEFAULTS: dict = {
+        "sqlfluff_keywords_case": "upper",
+        "sqlfluff_functions_case": "upper",
+        "sqlfluff_identifiers_case": "lower",
+        "sqlfluff_literals_case": "upper",
+        "sqlfluff_types_case": "upper",
+        "sqlfluff_indent_unit": "space",
+        "sqlfluff_tab_space_size": 4,
+        "sqlfluff_max_line_length": 80,
+        "sqlfluff_comma_position": "trailing",
+        "sqlfluff_require_semicolon": False,
+    }
+
+    # SQLFluff uses British spelling for these policy values.
+    _BASIC_CASE_CHOICES = [
+        ("UPPER", "upper"),
+        ("lower", "lower"),
+        ("Capitalise", "capitalise"),
+        ("Consistent", "consistent"),
+    ]
+    _EXTENDED_CASE_CHOICES = _BASIC_CASE_CHOICES + [("PascalCase", "pascal")]
+
+    def _create_formatting_tab(self) -> QWidget:
+        """Create the SQL Formatting page exposing user-friendly SQLFluff options."""
+        widget = QWidget()
+        outer = QVBoxLayout(widget)
+        outer.setSpacing(12)
+
+        # --- Capitalization section ---
+        cap_label = QLabel("Capitalization")
+        cap_label.setObjectName("settingsSectionLabel")
+        outer.addWidget(cap_label)
+
+        cap_form = QFormLayout()
+        self._configure_form_layout(cap_form)
+        cap_form.setContentsMargins(15, 0, 0, 0)
+
+        self.sqlfluff_keywords_combo = self._build_case_combo(
+            self._BASIC_CASE_CHOICES,
+            self.settings_data.get("sqlfluff_keywords_case", "upper"),
+        )
+        cap_form.addRow("Keywords (SELECT, FROM):", self.sqlfluff_keywords_combo)
+
+        self.sqlfluff_functions_combo = self._build_case_combo(
+            self._EXTENDED_CASE_CHOICES,
+            self.settings_data.get("sqlfluff_functions_case", "upper"),
+        )
+        cap_form.addRow("Functions (COUNT, SUM):", self.sqlfluff_functions_combo)
+
+        self.sqlfluff_identifiers_combo = self._build_case_combo(
+            self._EXTENDED_CASE_CHOICES,
+            self.settings_data.get("sqlfluff_identifiers_case", "lower"),
+        )
+        cap_form.addRow("Identifiers (table/column):", self.sqlfluff_identifiers_combo)
+
+        self.sqlfluff_literals_combo = self._build_case_combo(
+            self._BASIC_CASE_CHOICES,
+            self.settings_data.get("sqlfluff_literals_case", "upper"),
+        )
+        cap_form.addRow("Literals (TRUE, NULL):", self.sqlfluff_literals_combo)
+
+        self.sqlfluff_types_combo = self._build_case_combo(
+            self._EXTENDED_CASE_CHOICES,
+            self.settings_data.get("sqlfluff_types_case", "upper"),
+        )
+        cap_form.addRow("Data types (INT, VARCHAR):", self.sqlfluff_types_combo)
+
+        outer.addLayout(cap_form)
+
+        outer.addWidget(self._make_section_separator())
+
+        # --- Indentation section ---
+        indent_label = QLabel("Indentation")
+        indent_label.setObjectName("settingsSectionLabel")
+        outer.addWidget(indent_label)
+
+        indent_form = QFormLayout()
+        self._configure_form_layout(indent_form)
+        indent_form.setContentsMargins(15, 0, 0, 0)
+
+        self.sqlfluff_indent_unit_combo = DownwardComboBox()
+        self.sqlfluff_indent_unit_combo.addItem("Spaces", "space")
+        self.sqlfluff_indent_unit_combo.addItem("Tabs", "tab")
+        idx = self.sqlfluff_indent_unit_combo.findData(
+            self.settings_data.get("sqlfluff_indent_unit", "space")
+        )
+        if idx != -1:
+            self.sqlfluff_indent_unit_combo.setCurrentIndex(idx)
+        indent_form.addRow("Indent character:", self.sqlfluff_indent_unit_combo)
+
+        self.sqlfluff_tab_size_spin = QSpinBox()
+        self.sqlfluff_tab_size_spin.setRange(2, 8)
+        self.sqlfluff_tab_size_spin.setValue(
+            int(self.settings_data.get("sqlfluff_tab_space_size", 4))
+        )
+        indent_form.addRow("Spaces per indent:", self.sqlfluff_tab_size_spin)
+
+        outer.addLayout(indent_form)
+
+        outer.addWidget(self._make_section_separator())
+
+        # --- Layout & conventions section ---
+        layout_label = QLabel("Layout && conventions")
+        layout_label.setObjectName("settingsSectionLabel")
+        outer.addWidget(layout_label)
+
+        layout_form = QFormLayout()
+        self._configure_form_layout(layout_form)
+        layout_form.setContentsMargins(15, 0, 0, 0)
+
+        self.sqlfluff_max_line_spin = QSpinBox()
+        self.sqlfluff_max_line_spin.setRange(0, 200)
+        self.sqlfluff_max_line_spin.setSpecialValueText("No limit")
+        self.sqlfluff_max_line_spin.setValue(
+            int(self.settings_data.get("sqlfluff_max_line_length", 80))
+        )
+        self.sqlfluff_max_line_spin.setToolTip(
+            "Maximum line length in characters. Set to 0 to disable line-length checks."
+        )
+        layout_form.addRow("Max line length:", self.sqlfluff_max_line_spin)
+
+        self.sqlfluff_comma_combo = DownwardComboBox()
+        self.sqlfluff_comma_combo.addItem("Trailing (a, b,)", "trailing")
+        self.sqlfluff_comma_combo.addItem("Leading (a , b)", "leading")
+        idx = self.sqlfluff_comma_combo.findData(
+            self.settings_data.get("sqlfluff_comma_position", "trailing")
+        )
+        if idx != -1:
+            self.sqlfluff_comma_combo.setCurrentIndex(idx)
+        layout_form.addRow("Comma position:", self.sqlfluff_comma_combo)
+
+        self.sqlfluff_semicolon_check = QCheckBox()
+        self.sqlfluff_semicolon_check.setChecked(
+            bool(self.settings_data.get("sqlfluff_require_semicolon", False))
+        )
+        layout_form.addRow(
+            "Require trailing semicolon:", self.sqlfluff_semicolon_check
+        )
+
+        outer.addLayout(layout_form)
+
+        outer.addStretch()
+
+        # --- Reset to defaults ---
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        reset_btn = QPushButton("Reset to defaults")
+        reset_btn.clicked.connect(self._reset_formatting_defaults)
+        button_row.addWidget(reset_btn)
+        outer.addLayout(button_row)
+
+        return widget
+
+    @staticmethod
+    def _build_case_combo(choices: list[tuple[str, str]], current: str) -> "DownwardComboBox":
+        """Build a capitalization-policy combo box pre-selected to ``current``."""
+        combo = DownwardComboBox()
+        for label, value in choices:
+            combo.addItem(label, value)
+        idx = combo.findData(current)
+        if idx != -1:
+            combo.setCurrentIndex(idx)
+        return combo
+
+    @staticmethod
+    def _make_section_separator() -> QFrame:
+        """Return a thin horizontal divider used between formatting sections."""
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        return line
+
+    def _reset_formatting_defaults(self) -> None:
+        """Reset all SQL formatting controls to their built-in defaults."""
+        d = self._SQLFLUFF_DEFAULTS
+        for combo, key in (
+            (self.sqlfluff_keywords_combo, "sqlfluff_keywords_case"),
+            (self.sqlfluff_functions_combo, "sqlfluff_functions_case"),
+            (self.sqlfluff_identifiers_combo, "sqlfluff_identifiers_case"),
+            (self.sqlfluff_literals_combo, "sqlfluff_literals_case"),
+            (self.sqlfluff_types_combo, "sqlfluff_types_case"),
+            (self.sqlfluff_indent_unit_combo, "sqlfluff_indent_unit"),
+            (self.sqlfluff_comma_combo, "sqlfluff_comma_position"),
+        ):
+            idx = combo.findData(d[key])
+            if idx != -1:
+                combo.setCurrentIndex(idx)
+        self.sqlfluff_tab_size_spin.setValue(int(d["sqlfluff_tab_space_size"]))
+        self.sqlfluff_max_line_spin.setValue(int(d["sqlfluff_max_line_length"]))
+        self.sqlfluff_semicolon_check.setChecked(bool(d["sqlfluff_require_semicolon"]))
+
     def _create_export_tab(self) -> QWidget:
         """Create the Export settings page.
-        
+
         Returns:
             Widget containing export format settings controls.
         """
@@ -397,4 +592,14 @@ class SettingsDialog(QDialog):
             "engine_threads": self.threads_input.text().strip(),
             "engine_timezone": self.timezone_input.text().strip(),
             "engine_preserve_insertion_order": self.preserve_order_check.isChecked(),
+            "sqlfluff_keywords_case": self.sqlfluff_keywords_combo.currentData(),
+            "sqlfluff_functions_case": self.sqlfluff_functions_combo.currentData(),
+            "sqlfluff_identifiers_case": self.sqlfluff_identifiers_combo.currentData(),
+            "sqlfluff_literals_case": self.sqlfluff_literals_combo.currentData(),
+            "sqlfluff_types_case": self.sqlfluff_types_combo.currentData(),
+            "sqlfluff_indent_unit": self.sqlfluff_indent_unit_combo.currentData(),
+            "sqlfluff_tab_space_size": self.sqlfluff_tab_size_spin.value(),
+            "sqlfluff_max_line_length": self.sqlfluff_max_line_spin.value(),
+            "sqlfluff_comma_position": self.sqlfluff_comma_combo.currentData(),
+            "sqlfluff_require_semicolon": self.sqlfluff_semicolon_check.isChecked(),
         }
