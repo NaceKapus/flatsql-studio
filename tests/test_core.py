@@ -890,3 +890,209 @@ class TestNormalizeLoggerName:
         logger = get_logger("flatsql.core.engine")
         # Must be "flatsql.core.engine", not "flatsql.flatsql.core.engine".
         assert logger.name == "flatsql.core.engine"
+
+
+# ---------------------------------------------------------------------------
+# sqlfluff_config — render & write user SQLFluff config
+# ---------------------------------------------------------------------------
+
+class TestRenderSqlfluffConfig:
+    """render_sqlfluff_config produces a valid INI string with the expected sections."""
+
+    def _parse(self, text: str):
+        import configparser
+
+        # configparser disallows duplicate sections by default, which is fine.
+        parser = configparser.ConfigParser()
+        parser.read_string(text)
+        return parser
+
+    def test_defaults_produce_expected_sections(self) -> None:
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sqlfluff_config import render_sqlfluff_config
+
+        parser = self._parse(render_sqlfluff_config(DEFAULT_SETTINGS))
+
+        # Root sqlfluff section carries dialect and max_line_length.
+        assert parser["sqlfluff"]["dialect"] == "duckdb"
+        assert int(parser["sqlfluff"]["max_line_length"]) == 80
+
+        # Indentation lives under [sqlfluff:indentation], NOT under any rules section.
+        assert parser["sqlfluff:indentation"]["indent_unit"] == "space"
+        assert int(parser["sqlfluff:indentation"]["tab_space_size"]) == 4
+
+        # Keywords/literals use capitalisation_policy.
+        assert (
+            parser["sqlfluff:rules:capitalisation.keywords"]["capitalisation_policy"]
+            == "upper"
+        )
+        assert (
+            parser["sqlfluff:rules:capitalisation.literals"]["capitalisation_policy"]
+            == "upper"
+        )
+
+        # Functions/identifiers/types use extended_capitalisation_policy.
+        assert (
+            parser["sqlfluff:rules:capitalisation.functions"][
+                "extended_capitalisation_policy"
+            ]
+            == "upper"
+        )
+        assert (
+            parser["sqlfluff:rules:capitalisation.identifiers"][
+                "extended_capitalisation_policy"
+            ]
+            == "lower"
+        )
+        assert (
+            parser["sqlfluff:rules:capitalisation.types"][
+                "extended_capitalisation_policy"
+            ]
+            == "upper"
+        )
+
+        # Layout sections use the correct INI paths (not the buggy ones from the old
+        # bundled .sqlfluff).
+        assert parser["sqlfluff:layout:type:comma"]["line_position"] == "trailing"
+        assert (
+            parser["sqlfluff:rules:convention.terminator"]["require_final_semicolon"]
+            == "False"
+        )
+
+    def test_overrides_round_trip(self) -> None:
+        from flatsql.core.sqlfluff_config import render_sqlfluff_config
+
+        overrides = {
+            "sqlfluff_keywords_case": "lower",
+            "sqlfluff_functions_case": "pascal",
+            "sqlfluff_identifiers_case": "upper",
+            "sqlfluff_literals_case": "lower",
+            "sqlfluff_types_case": "capitalise",
+            "sqlfluff_indent_unit": "tab",
+            "sqlfluff_tab_space_size": 2,
+            "sqlfluff_max_line_length": 0,
+            "sqlfluff_comma_position": "leading",
+            "sqlfluff_require_semicolon": True,
+        }
+
+        parser = self._parse(render_sqlfluff_config(overrides))
+
+        assert int(parser["sqlfluff"]["max_line_length"]) == 0
+        assert parser["sqlfluff:indentation"]["indent_unit"] == "tab"
+        assert int(parser["sqlfluff:indentation"]["tab_space_size"]) == 2
+        assert (
+            parser["sqlfluff:rules:capitalisation.keywords"]["capitalisation_policy"]
+            == "lower"
+        )
+        assert (
+            parser["sqlfluff:rules:capitalisation.functions"][
+                "extended_capitalisation_policy"
+            ]
+            == "pascal"
+        )
+        assert parser["sqlfluff:layout:type:comma"]["line_position"] == "leading"
+        assert (
+            parser["sqlfluff:rules:convention.terminator"]["require_final_semicolon"]
+            == "True"
+        )
+
+    def test_loadable_by_sqlfluff(self) -> None:
+        """The rendered config must be readable by SQLFluff itself."""
+        from sqlfluff.core import FluffConfig
+
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sqlfluff_config import render_sqlfluff_config
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".cfg", delete=False, encoding="utf-8"
+        ) as f:
+            f.write(render_sqlfluff_config(DEFAULT_SETTINGS))
+            cfg_path = f.name
+
+        try:
+            # If the INI is malformed or uses non-existent sections/keys,
+            # this raises before we can verify any rule is active.
+            FluffConfig.from_path(cfg_path)
+        finally:
+            os.unlink(cfg_path)
+
+
+class TestWriteUserSqlfluffConfig:
+    """write_user_sqlfluff_config writes the rendered file and returns the path."""
+
+    def test_writes_file_at_user_path(self, tmp_path, monkeypatch) -> None:
+        from flatsql.core import sqlfluff_config as sqlfluff_config_module
+
+        target = tmp_path / "sqlfluff.cfg"
+        monkeypatch.setattr(sqlfluff_config_module, "USER_DATA_DIR", str(tmp_path))
+        monkeypatch.setattr(sqlfluff_config_module, "USER_SQLFLUFF_PATH", str(target))
+
+        returned_path = sqlfluff_config_module.write_user_sqlfluff_config(
+            {"sqlfluff_keywords_case": "lower"}
+        )
+
+        assert returned_path == str(target)
+        assert target.exists()
+        contents = target.read_text(encoding="utf-8")
+        assert "capitalisation_policy = lower" in contents
+
+
+class TestSqlFormatterEndToEnd:
+    """SQLFormatter actually applies the user's settings and picks up reloads.
+
+    These tests exist because previous implementations using
+    ``Linter(config=FluffConfig.from_path(...))`` silently dropped the
+    capitalisation rule, and SQLFluff's path-keyed config cache meant
+    rewrites to the same path were ignored without an explicit cache clear.
+    """
+
+    def _write_config(self, tmp_path, settings) -> str:
+        from flatsql.core.sqlfluff_config import render_sqlfluff_config
+
+        cfg = tmp_path / "sqlfluff.cfg"
+        cfg.write_text(render_sqlfluff_config(settings), encoding="utf-8")
+        return str(cfg)
+
+    def test_default_config_uppercases_keywords(self, tmp_path) -> None:
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sql_formatter import SQLFormatter
+
+        path = self._write_config(tmp_path, DEFAULT_SETTINGS)
+        out = SQLFormatter(path).format("select * from foo where bar=1")
+
+        assert "SELECT" in out and "FROM" in out and "WHERE" in out
+        assert "select" not in out.lower().split("\n")[0].split() or "SELECT" in out
+
+    def test_lowercase_keywords_setting_takes_effect(self, tmp_path) -> None:
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sql_formatter import SQLFormatter
+
+        custom = dict(DEFAULT_SETTINGS)
+        custom["sqlfluff_keywords_case"] = "lower"
+        path = self._write_config(tmp_path, custom)
+
+        out = SQLFormatter(path).format("SELECT * FROM foo WHERE bar=1")
+        assert "select" in out and "from" in out and "where" in out
+        assert "SELECT" not in out
+
+    def test_reload_picks_up_new_settings_at_same_path(self, tmp_path) -> None:
+        # SQLFluff caches by path, so this regression-tests the cache-clear
+        # in SQLFormatter.reload().
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sql_formatter import SQLFormatter
+        from flatsql.core.sqlfluff_config import render_sqlfluff_config
+
+        cfg = tmp_path / "sqlfluff.cfg"
+        cfg.write_text(render_sqlfluff_config(DEFAULT_SETTINGS), encoding="utf-8")
+        fmt = SQLFormatter(str(cfg))
+        first = fmt.format("select * from foo where bar=1")
+        assert "SELECT" in first
+
+        custom = dict(DEFAULT_SETTINGS)
+        custom["sqlfluff_keywords_case"] = "lower"
+        cfg.write_text(render_sqlfluff_config(custom), encoding="utf-8")
+        fmt.reload(str(cfg))
+
+        second = fmt.format("SELECT * FROM foo WHERE bar=1")
+        assert "select" in second
+        assert "SELECT" not in second

@@ -12,6 +12,7 @@ from PySide6.QtGui import QDesktopServices
 from flatsql.config import SNIPPETS_DIR, LOG_PATH
 from flatsql.core.path_utils import to_duckdb_path, to_duckdb_relation
 from flatsql.core.sql_generator import SQLGenerator
+from flatsql.core.sqlfluff_config import write_user_sqlfluff_config
 from flatsql.core.exporter import DataExporter
 from flatsql.core.theme import ThemeManager
 from flatsql.ui.dialogs.file_ops import SplitFileDialog, MergeFilesDialog, ExportDialog
@@ -585,6 +586,9 @@ class ActionController:
 
             if new_settings['theme'] != old_theme:
                 self.mw._apply_theme(new_settings['theme'])
+
+            sqlfluff_path = write_user_sqlfluff_config(self.mw.settings_manager._settings)
+            self.mw.sql_formatter.reload(sqlfluff_path)
         else:
             self.mw._apply_theme(original_theme)
 

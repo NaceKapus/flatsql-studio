@@ -34,7 +34,17 @@ DEFAULT_SETTINGS = {
     'engine_max_spill_size': '',
     'engine_threads': '',
     'engine_timezone': 'UTC',
-    'engine_preserve_insertion_order': True
+    'engine_preserve_insertion_order': True,
+    'sqlfluff_keywords_case': 'upper',
+    'sqlfluff_functions_case': 'upper',
+    'sqlfluff_identifiers_case': 'lower',
+    'sqlfluff_literals_case': 'upper',
+    'sqlfluff_types_case': 'upper',
+    'sqlfluff_indent_unit': 'space',
+    'sqlfluff_tab_space_size': 4,
+    'sqlfluff_max_line_length': 80,
+    'sqlfluff_comma_position': 'trailing',
+    'sqlfluff_require_semicolon': False,
 }
 
 logger = get_logger(__name__)

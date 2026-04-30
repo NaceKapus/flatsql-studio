@@ -11,13 +11,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontDatabase, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QSplitter, QVBoxLayout, QWidget
 
-from flatsql.config import APP_VERSION, ASSETS_DIR, SQLFLUFF_CONFIG_PATH, THEMES_DIR
+from flatsql.config import APP_VERSION, ASSETS_DIR, THEMES_DIR
 from flatsql.core.action_controller import ActionController
 from flatsql.core.connection_manager import ConnectionManager
 from flatsql.core.history import HistoryManager
 from flatsql.core.query_controller import QueryController
 from flatsql.core.settings import SettingsManager
 from flatsql.core.sql_formatter import SQLFormatter
+from flatsql.core.sqlfluff_config import write_user_sqlfluff_config
 from flatsql.core.theme import ThemeManager
 from flatsql.ui.panels.db_explorer_panel import DBExplorerPanel
 from flatsql.ui.panels.file_explorer_panel import FileExplorerPanel
@@ -44,7 +45,8 @@ class MainWindow(QMainWindow):
         self.conn_manager.error_occurred.connect(lambda t, m: QMessageBox.critical(self, t, m))
         
         self.db_keywords, self.db_functions = [], []
-        self.sql_formatter = SQLFormatter(SQLFLUFF_CONFIG_PATH)
+        sqlfluff_path = write_user_sqlfluff_config(self.settings_manager._settings)
+        self.sql_formatter = SQLFormatter(sqlfluff_path)
         self.query_controller = QueryController(self.conn_manager)
         self.action_controller = ActionController(self)
     
