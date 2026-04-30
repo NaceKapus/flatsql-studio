@@ -89,6 +89,9 @@
             "border": "none",
             "background-color": "#002B36"
         },
+        "QFrame#queryEmptyStateCard": {
+            "border-color": "#586E75"
+        },
         "QTabBar::tab:selected": {
             "border-top": "2px solid #2AA198"
         },
