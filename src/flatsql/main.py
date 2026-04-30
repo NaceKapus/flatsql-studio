@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QSplitter,
 from flatsql.config import APP_VERSION, ASSETS_DIR, THEMES_DIR
 from flatsql.core.action_controller import ActionController
 from flatsql.core.connection_manager import ConnectionManager
+from flatsql.core.extension_manager import ExtensionManager
 from flatsql.core.history import HistoryManager
 from flatsql.core.query_controller import QueryController
 from flatsql.core.settings import SettingsManager
@@ -43,7 +44,10 @@ class MainWindow(QMainWindow):
 
         self.conn_manager = ConnectionManager(self.settings_manager)
         self.conn_manager.error_occurred.connect(lambda t, m: QMessageBox.critical(self, t, m))
-        
+
+        self.extension_manager = ExtensionManager(self.conn_manager, self.settings_manager)
+        self.conn_manager.set_extension_manager(self.extension_manager)
+
         self.db_keywords, self.db_functions = [], []
         sqlfluff_path = write_user_sqlfluff_config(self.settings_manager._settings)
         self.sql_formatter = SQLFormatter(sqlfluff_path)
@@ -369,5 +373,6 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: Any) -> None:
         """Persist session state and close background resources on exit."""
+        self.extension_manager.shutdown()
         self.action_controller.save_session_and_cleanup()
         event.accept()

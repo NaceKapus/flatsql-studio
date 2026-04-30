@@ -40,17 +40,35 @@ class ConnectionManager(QObject):
         self.fs_connections: dict[str, FileSystemConnector] = {}
         self.db_keywords: list[str] = []
         self.db_functions: list[str] = []
+        self.extension_manager: Any = None
+
+    def set_extension_manager(self, extension_manager: Any) -> None:
+        """Wire the ExtensionManager so new connections auto-load persisted extensions."""
+        self.extension_manager = extension_manager
+
+    def _apply_extension_autoload(self, engine: FlatEngine, key: str) -> None:
+        """Replay the user's auto-load list against a freshly created engine."""
+        if self.extension_manager is None:
+            return
+        try:
+            self.extension_manager.apply_autoload(engine, key)
+        except Exception:
+            logger.exception("Failed to apply extension auto-load for %s.", key)
 
     def initialize_all(self) -> None:
         """Synchronously establishes all initial database and file system connections."""
         try:
-            self.db_connections[":memory:"] = FlatEngine(db_path=None, is_temp=True)
+            engine = FlatEngine(db_path=None, is_temp=True)
+            self.db_connections[":memory:"] = engine
+            self._apply_extension_autoload(engine, ":memory:")
         except Exception:
             logger.exception("Failed to connect to the in-memory database.")
 
         for db_file in self.settings_manager.get('connections', []):
             try:
-                self.db_connections[db_file] = FlatEngine(db_path=db_file)
+                engine = FlatEngine(db_path=db_file)
+                self.db_connections[db_file] = engine
+                self._apply_extension_autoload(engine, db_file)
             except Exception:
                 logger.exception("Failed to connect to saved database %s.", db_file)
 
@@ -166,7 +184,8 @@ class ConnectionManager(QObject):
         try:
             engine = FlatEngine(db_path, is_temp)
             self.db_connections[key] = engine
-            
+            self._apply_extension_autoload(engine, key)
+
             if not is_temp:
                 current_conns = self.settings_manager.get('connections', [])
                 if db_path not in current_conns:
@@ -196,6 +215,12 @@ class ConnectionManager(QObject):
         if key in databricks_conns:
             del databricks_conns[key]
             self.settings_manager.set('databricks_connections', databricks_conns)
+            self.settings_manager.save()
+
+        autoload = dict(self.settings_manager.get('extension_autoload', {}) or {})
+        if key in autoload:
+            del autoload[key]
+            self.settings_manager.set('extension_autoload', autoload)
             self.settings_manager.save()
 
         self.db_connections_changed.emit()

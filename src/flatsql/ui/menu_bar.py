@@ -159,6 +159,9 @@ class MainMenuBar(QMenuBar):
         profiler_action = QAction("DuckDB Profiler", self, triggered=self.action_controller.show_duckdb_profiler)
         tools_menu.addAction(profiler_action)
 
+        extensions_action = QAction("Extensions", self, triggered=self.action_controller.show_extensions_dialog)
+        tools_menu.addAction(extensions_action)
+
         tools_menu.addSeparator()
 
         view_logs_action = QAction("View Logs", self, triggered=self.action_controller.open_logs)
