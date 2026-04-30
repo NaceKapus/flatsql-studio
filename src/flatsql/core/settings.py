@@ -46,6 +46,7 @@ DEFAULT_SETTINGS = {
     'sqlfluff_comma_position': 'trailing',
     'sqlfluff_require_semicolon': False,
     'sqlfluff_quote_identifiers': True,
+    'preview_row_limit': 1000,
 }
 
 logger = get_logger(__name__)
