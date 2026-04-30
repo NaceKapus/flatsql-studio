@@ -245,6 +245,7 @@ class SettingsDialog(QDialog):
         "sqlfluff_max_line_length": 80,
         "sqlfluff_comma_position": "trailing",
         "sqlfluff_require_semicolon": False,
+        "sqlfluff_quote_identifiers": True,
     }
 
     # SQLFluff uses British spelling for these policy values.
@@ -288,6 +289,20 @@ class SettingsDialog(QDialog):
             self.settings_data.get("sqlfluff_identifiers_case", "lower"),
         )
         cap_form.addRow("Identifiers (table/column):", self.sqlfluff_identifiers_combo)
+
+        self.sqlfluff_quote_identifiers_check = QCheckBox()
+        self.sqlfluff_quote_identifiers_check.setChecked(
+            bool(self.settings_data.get("sqlfluff_quote_identifiers", True))
+        )
+        self.sqlfluff_quote_identifiers_check.setToolTip(
+            "Always wrap table and column identifiers in double quotes, "
+            "even when not strictly required. Helps avoid collisions with "
+            "reserved keywords like 'name' or 'index'."
+        )
+        cap_form.addRow(
+            "Always quote identifiers:",
+            self.sqlfluff_quote_identifiers_check,
+        )
 
         self.sqlfluff_literals_combo = self._build_case_combo(
             self._BASIC_CASE_CHOICES,
@@ -424,6 +439,7 @@ class SettingsDialog(QDialog):
         self.sqlfluff_tab_size_spin.setValue(int(d["sqlfluff_tab_space_size"]))
         self.sqlfluff_max_line_spin.setValue(int(d["sqlfluff_max_line_length"]))
         self.sqlfluff_semicolon_check.setChecked(bool(d["sqlfluff_require_semicolon"]))
+        self.sqlfluff_quote_identifiers_check.setChecked(bool(d["sqlfluff_quote_identifiers"]))
 
     def _create_export_tab(self) -> QWidget:
         """Create the Export settings page.
@@ -602,4 +618,5 @@ class SettingsDialog(QDialog):
             "sqlfluff_max_line_length": self.sqlfluff_max_line_spin.value(),
             "sqlfluff_comma_position": self.sqlfluff_comma_combo.currentData(),
             "sqlfluff_require_semicolon": self.sqlfluff_semicolon_check.isChecked(),
+            "sqlfluff_quote_identifiers": self.sqlfluff_quote_identifiers_check.isChecked(),
         }

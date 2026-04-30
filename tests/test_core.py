@@ -959,6 +959,12 @@ class TestRenderSqlfluffConfig:
             == "False"
         )
 
+        # references.quoting drives the SQLFormatter's identifier-quote post-pass.
+        assert (
+            parser["sqlfluff:rules:references.quoting"]["prefer_quoted_identifiers"]
+            == "True"
+        )
+
     def test_overrides_round_trip(self) -> None:
         from flatsql.core.sqlfluff_config import render_sqlfluff_config
 
@@ -1096,3 +1102,71 @@ class TestSqlFormatterEndToEnd:
         second = fmt.format("SELECT * FROM foo WHERE bar=1")
         assert "select" in second
         assert "SELECT" not in second
+
+    def test_quote_identifiers_setting_wraps_unquoted_refs(self, tmp_path) -> None:
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sql_formatter import SQLFormatter
+
+        custom = dict(DEFAULT_SETTINGS)
+        custom["sqlfluff_quote_identifiers"] = True
+        path = self._write_config(tmp_path, custom)
+
+        out = SQLFormatter(path).format("SELECT index, name FROM tbl")
+
+        # Bare identifiers should now be quoted while functions and string
+        # literals remain alone.
+        assert '"index"' in out
+        assert '"name"' in out
+        assert '"tbl"' in out
+
+    def test_quote_identifiers_disabled_leaves_refs_bare(self, tmp_path) -> None:
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sql_formatter import SQLFormatter
+
+        custom = dict(DEFAULT_SETTINGS)
+        custom["sqlfluff_quote_identifiers"] = False
+        path = self._write_config(tmp_path, custom)
+
+        out = SQLFormatter(path).format("SELECT index, name FROM tbl")
+
+        assert '"index"' not in out
+        assert '"name"' not in out
+        assert '"tbl"' not in out
+
+    def test_quote_identifiers_skips_string_literals(self, tmp_path) -> None:
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sql_formatter import SQLFormatter
+
+        custom = dict(DEFAULT_SETTINGS)
+        custom["sqlfluff_quote_identifiers"] = True
+        path = self._write_config(tmp_path, custom)
+
+        out = SQLFormatter(path).format(
+            "SELECT col FROM 'C:/data.csv' WHERE status = 'active'"
+        )
+
+        # The CSV path and the literal value must remain single-quoted.
+        assert "'C:/data.csv'" in out
+        assert "'active'" in out
+        assert '"col"' in out
+
+    def test_quote_identifiers_lowercases_pre_quoted_refs(self, tmp_path) -> None:
+        # SQLFluff's CP02 only re-cases unquoted identifiers, so when the user
+        # opts into always-quote we have to lower-case pre-quoted references
+        # ourselves to match the configured identifier case policy.
+        from flatsql.core.settings import DEFAULT_SETTINGS
+        from flatsql.core.sql_formatter import SQLFormatter
+
+        custom = dict(DEFAULT_SETTINGS)
+        custom["sqlfluff_quote_identifiers"] = True
+        custom["sqlfluff_identifiers_case"] = "lower"
+        path = self._write_config(tmp_path, custom)
+
+        out = SQLFormatter(path).format(
+            'SELECT "MyCol", "OtherCol" FROM "MyTable"'
+        )
+
+        assert '"mycol"' in out
+        assert '"othercol"' in out
+        assert '"mytable"' in out
+        assert '"MyCol"' not in out
