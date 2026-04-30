@@ -595,13 +595,13 @@ class ActionController:
     def show_duckdb_profiler(self) -> None:
         """Open the modeless DuckDB profiler dialog for the active connection."""
         from flatsql.ui.dialogs.profiler import DuckDBProfilerDialog
-        
+
         active_editor = self.mw.query_panel.get_active_editor()
         conn_key = getattr(active_editor, 'connection_key', None) if active_editor else None
-        
+
         if not conn_key and ":memory:" in self.mw.conn_manager.db_connections:
             conn_key = ":memory:"
-            
+
         if not conn_key:
             QMessageBox.warning(self.mw, "No Connection", "No active connection to profile.")
             return
@@ -610,6 +610,35 @@ class ActionController:
 
         self.profiler_dialog = DuckDBProfilerDialog(engine, self.mw)
         self.profiler_dialog.show()
+
+    def show_extensions_dialog(self) -> None:
+        """Open the modeless DuckDB extension manager for the active connection."""
+        from flatsql.ui.dialogs.extensions import ExtensionsDialog
+
+        if not self.mw.conn_manager.db_connections:
+            QMessageBox.warning(self.mw, "No Connection", "No active connection to manage extensions for.")
+            return
+
+        active_editor = self.mw.query_panel.get_active_editor()
+        initial_key = getattr(active_editor, 'connection_key', None) if active_editor else None
+        if initial_key not in self.mw.conn_manager.db_connections:
+            initial_key = ":memory:" if ":memory:" in self.mw.conn_manager.db_connections else None
+
+        existing = getattr(self, 'extensions_dialog', None)
+        if existing is not None and existing.isVisible():
+            existing.raise_()
+            existing.activateWindow()
+            if initial_key:
+                existing.set_connection(initial_key)
+            return
+
+        self.extensions_dialog = ExtensionsDialog(
+            self.mw.conn_manager,
+            self.mw.extension_manager,
+            initial_connection_key=initial_key,
+            parent=self.mw,
+        )
+        self.extensions_dialog.show()
 
     def open_logs(self) -> None:
         """Open the FlatSQL Studio log file in the default text editor."""
