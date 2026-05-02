@@ -1,7 +1,8 @@
 ﻿{
     "name": "Solarized Dark",
     "description": "Precision deep teal theme designed to reduce eye strain.",
-    "sort_order": 12,
+    "variant": "dark",
+    "sort_order": 19,
     "palette": {
         "Window": "#073642",
         "WindowText": "#839496",

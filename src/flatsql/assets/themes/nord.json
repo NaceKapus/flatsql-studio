@@ -1,7 +1,8 @@
 ﻿{
     "name": "Nord",
     "description": "Frosty dark theme with authentic Polar Night backgrounds and Aurora accents.",
-    "sort_order": 9,
+    "variant": "dark",
+    "sort_order": 17,
     "palette": {
         "Window": "#3B4252",
         "WindowText": "#D8DEE9",

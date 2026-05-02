@@ -1,7 +1,8 @@
 ﻿{
     "name": "Tokyo Night",
     "description": "A clean, dark theme that celebrates the neon lights of Tokyo at night.",
-    "sort_order": 13,
+    "variant": "dark",
+    "sort_order": 20,
     "palette": {
         "Window": "#1a1b26",
         "WindowText": "#c0caf5",

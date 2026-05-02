@@ -1,7 +1,8 @@
 ﻿{
     "name": "Gruvbox Dark",
     "description": "Retro groove color scheme with warm, earthy tones.",
-    "sort_order": 6,
+    "variant": "dark",
+    "sort_order": 15,
     "palette": {
         "Window": "#32302f",
         "WindowText": "#ebdbb2",

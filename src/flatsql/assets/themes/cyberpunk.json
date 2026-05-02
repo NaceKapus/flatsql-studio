@@ -1,7 +1,8 @@
 ﻿{
     "name": "Cyberpunk",
     "description": "Neon-drenched synthwave aesthetic with deep indigo and bright cyan.",
-    "sort_order": 3,
+    "variant": "dark",
+    "sort_order": 12,
     "palette": {
         "Window": "#08080f",
         "WindowText": "#e2e8f0",
