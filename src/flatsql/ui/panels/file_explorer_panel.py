@@ -36,9 +36,14 @@ class FileExplorerPanel(QFrame):
     action_convert_file = Signal(str, str)
     action_create_table = Signal(str, str)
     action_create_view = Signal(str, str)
-    
+
     action_merge_folder = Signal(str, str)
     action_select_folder = Signal(str, str, str)
+
+    action_script_select_delta = Signal(str, str)
+    action_script_select_delta_version = Signal(str, str)
+    action_show_schema_delta = Signal(str, str)
+    action_show_stats_delta = Signal(str, str)
 
     def __init__(self, theme_colors: dict[str, str], settings_manager: Any, 
                  file_system_connections: dict[str, Any], get_active_engine_func: Any, 
@@ -304,7 +309,7 @@ class FileExplorerPanel(QFrame):
             for display_name, file_type, full_path in sorted(files, key=lambda x: (0 if x[1] == 'directory' else 1, x[0].lower())):
                 icon = None
                 icon_info = connector.get_icon_info(full_path, file_type == 'directory') if hasattr(connector, 'get_icon_info') else None
-                
+
                 if icon_info:
                     if isinstance(icon_info, QIcon):
                         icon = icon_info
@@ -321,8 +326,14 @@ class FileExplorerPanel(QFrame):
                         icon_color = self.theme_colors.get('icon', '#6C757D')
                         icon = qta.icon('fa5s.folder', color='goldenrod') if file_type == 'directory' else qta.icon('fa5s.file', color=icon_color)
 
+                is_delta_table = (
+                    file_type == 'directory'
+                    and hasattr(connector, 'is_delta_table')
+                    and connector.is_delta_table(full_path)
+                )
+
                 child_item = QStandardItem(icon, display_name)
-                if file_type == 'directory':
+                if file_type == 'directory' and not is_delta_table:
                     child_item.appendRow(QStandardItem())
                 child_item.setEditable(False)
                 child_item.setData(conn_name, Qt.UserRole + 1)
@@ -330,6 +341,8 @@ class FileExplorerPanel(QFrame):
                 child_item.setData(full_path, Qt.UserRole + 3)
                 converted_path = self._convert_to_abfs_path(full_path)
                 child_item.setData(converted_path, Qt.UserRole + 4)
+                if is_delta_table:
+                    child_item.setData("delta_table", Qt.UserRole + 5)
                 item.appendRow(child_item)
         finally:
             self.file_tree.set_loading_state(index, False)
@@ -345,8 +358,9 @@ class FileExplorerPanel(QFrame):
 
         item = self.file_model.itemFromIndex(index)
         is_connection = item.data(Qt.UserRole + 2) == "connection"
-        is_expandable = item.hasChildren() or is_connection
-        
+        is_delta_table = item.data(Qt.UserRole + 5) == "delta_table"
+        is_expandable = (item.hasChildren() or is_connection) and not is_delta_table
+
         if is_expandable:
             return
 
@@ -372,7 +386,10 @@ class FileExplorerPanel(QFrame):
                 if engine:
                     connector._setup_duckdb_secret(engine, account_name)
 
-        self.action_script_select.emit(full_path, display_name, True)
+        if is_delta_table:
+            self.action_script_select_delta.emit(full_path, display_name)
+        else:
+            self.action_script_select.emit(full_path, display_name, True)
 
     def _convert_to_abfs_path(self, path: str) -> str:
         """Convert Azure internal tree paths to DuckDB abfss:// paths.
@@ -453,11 +470,12 @@ class FileExplorerPanel(QFrame):
         item = self.file_model.itemFromIndex(index)
         is_connection = item.data(Qt.UserRole + 2) == "connection"
         is_favorites_root = item.data(Qt.UserRole + 2) == "favorites_root"
-        
+        is_delta_table = item.data(Qt.UserRole + 5) == "delta_table"
+
         raw_full_path = item.data(Qt.UserRole + 3)
         full_path = self._convert_to_abfs_path(raw_full_path)
         display_name = item.text()
-        is_expandable = item.hasChildren() or is_connection
+        is_expandable = (item.hasChildren() or is_connection) and not is_delta_table
 
         is_inside_favorites = False
         temp = item
@@ -495,7 +513,14 @@ class FileExplorerPanel(QFrame):
         actions: dict[Any, Any] = {}
 
         if not is_connection and not is_favorites_root:
-            if not is_expandable:
+            if is_delta_table:
+                preview_label = SQLGenerator.select_top_menu_label(self._preview_row_limit(), " from Delta Table")
+                actions[menu.addAction(preview_label)] = lambda: self.action_script_select_delta.emit(full_path, display_name)
+                actions[menu.addAction("Show Schema")] = lambda: self.action_show_schema_delta.emit(full_path, display_name)
+                actions[menu.addAction("Show Stats")] = lambda: self.action_show_stats_delta.emit(full_path, display_name)
+                menu.addSeparator()
+                actions[menu.addAction(qta.icon('mdi.history'), "Time-travel by version…")] = lambda: self.action_script_select_delta_version.emit(full_path, display_name)
+            elif not is_expandable:
                 preview_label = SQLGenerator.select_top_menu_label(self._preview_row_limit())
                 if full_path and full_path.lower().endswith((".json", ".jsonl", ".ndjson")):
                     select_menu = menu.addMenu(preview_label)
