@@ -58,3 +58,22 @@ def to_duckdb_relation(path_value: str | os.PathLike[str]) -> str:
         return f"read_csv_auto('{escaped_path}', delim='{delimiter}')"
 
     return f"'{escaped_path}'"
+
+
+def to_duckdb_delta_relation(path_value: str | os.PathLike[str], version: int | None = None) -> str:
+    """Return a ``delta_scan(...)`` relation expression for a Delta table path.
+
+    Args:
+        path_value: Path to a Delta table directory (the directory containing
+            ``_delta_log/``), local or remote (e.g. ``abfss://``, ``az://``).
+        version: Optional Delta version for time-travel queries. When provided,
+            emits ``delta_scan('path', version=N)``.
+
+    Returns:
+        SQL relation expression suitable for a FROM clause.
+    """
+    normalized_path = to_duckdb_path(path_value)
+    escaped_path = normalized_path.replace("'", "''")
+    if version is not None:
+        return f"delta_scan('{escaped_path}', version={int(version)})"
+    return f"delta_scan('{escaped_path}')"

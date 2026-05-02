@@ -112,6 +112,73 @@ class TestToDuckdbRelation:
         )
 
 
+class TestToDuckdbDeltaRelation:
+    """to_duckdb_delta_relation emits a delta_scan() FROM expression."""
+
+    def test_basic_relation_no_version(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        assert to_duckdb_delta_relation("C:\\data\\my_delta") == "delta_scan('C:/data/my_delta')"
+
+    def test_relation_with_version(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        assert to_duckdb_delta_relation("C:/data/my_delta", version=3) == (
+            "delta_scan('C:/data/my_delta', version=3)"
+        )
+
+    def test_version_zero_emits_zero(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        assert to_duckdb_delta_relation("C:/data/my_delta", version=0).endswith("version=0)")
+
+    def test_path_with_apostrophe_is_escaped(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        assert to_duckdb_delta_relation("C:/Bobby's Data/my_delta") == (
+            "delta_scan('C:/Bobby''s Data/my_delta')"
+        )
+
+    def test_abfss_path_passthrough(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        result = to_duckdb_delta_relation("abfss://acct.dfs.core.windows.net/container/my_delta")
+        assert result == "delta_scan('abfss://acct.dfs.core.windows.net/container/my_delta')"
+
+
+class TestIsDeltaTableLocal:
+    """LocalFileSystemConnector.is_delta_table detects _delta_log/ subfolders."""
+
+    def test_directory_with_delta_log_returns_true(self, tmp_path: Path) -> None:
+        from flatsql.core.connector import LocalFileSystemConnector
+
+        delta_dir = tmp_path / "my_delta"
+        (delta_dir / "_delta_log").mkdir(parents=True)
+
+        connector = LocalFileSystemConnector()
+        assert connector.is_delta_table(str(delta_dir)) is True
+
+    def test_directory_without_delta_log_returns_false(self, tmp_path: Path) -> None:
+        from flatsql.core.connector import LocalFileSystemConnector
+
+        plain_dir = tmp_path / "plain"
+        plain_dir.mkdir()
+
+        connector = LocalFileSystemConnector()
+        assert connector.is_delta_table(str(plain_dir)) is False
+
+    def test_empty_path_returns_false(self) -> None:
+        from flatsql.core.connector import LocalFileSystemConnector
+
+        assert LocalFileSystemConnector().is_delta_table("") is False
+
+    def test_nonexistent_path_returns_false(self, tmp_path: Path) -> None:
+        from flatsql.core.connector import LocalFileSystemConnector
+
+        connector = LocalFileSystemConnector()
+        assert connector.is_delta_table(str(tmp_path / "does_not_exist")) is False
+
+
 # ---------------------------------------------------------------------------
 # SQLGenerator
 # ---------------------------------------------------------------------------

@@ -54,6 +54,24 @@ class FileSystemConnector(ABC):
         """Return icon metadata for a path, or `None` to use defaults."""
         return None
 
+    def is_delta_table(self, path: str) -> bool:
+        """Return True if ``path`` points at a Delta Lake table directory.
+
+        A Delta table is identified by the presence of a ``_delta_log/``
+        sub-directory directly under ``path``. Concrete connectors override
+        this with filesystem-appropriate detection logic.
+        """
+        return False
+
+
+def _delta_icon() -> QIcon | None:
+    """Load the shared Delta-table SVG icon if it exists on disk."""
+    icon_path = os.path.join(ASSETS_DIR, 'img', 'Delta.svg')
+    if os.path.exists(icon_path):
+        return QIcon(icon_path)
+    return None
+
+
 class LocalFileSystemConnector(FileSystemConnector):
     """Connector for the local machine's file system."""
 
@@ -130,6 +148,23 @@ class LocalFileSystemConnector(FileSystemConnector):
         """Return the root path for local browsing."""
         return ""
 
+    def is_delta_table(self, path: str) -> bool:
+        """Return True if ``path`` is a local directory containing ``_delta_log/``."""
+        if not path:
+            return False
+        try:
+            return os.path.isdir(os.path.join(path, "_delta_log"))
+        except OSError:
+            return False
+
+    def get_icon_info(self, path: str, is_dir: bool) -> IconInfo:
+        """Return the Delta icon for Delta-table directories, otherwise default."""
+        if is_dir and self.is_delta_table(path):
+            icon = _delta_icon()
+            if icon is not None:
+                return icon
+        return None
+
 
 class AzureConnector(FileSystemConnector):
     """Browse Azure subscriptions, storage accounts, containers, and blobs."""
@@ -146,6 +181,7 @@ class AzureConnector(FileSystemConnector):
         self.tenant_id = tenant_id
         self.authentication_record = authentication_record
         self.account_hns_cache: dict[str, bool] = {}
+        self.delta_table_cache: dict[str, bool] = {}
         if self.authentication_record:
             self.user_display_name = self.authentication_record.username
         else:
@@ -271,6 +307,7 @@ class AzureConnector(FileSystemConnector):
             token = self._get_storage_token()
             con = engine.main_con
             con.execute("INSTALL azure; LOAD azure;")
+            con.execute("INSTALL delta; LOAD delta;")
             sanitized_acc = account_name.replace('-', '_')
             secret_name = f"azure_secret_{sanitized_acc}"
 
@@ -368,15 +405,66 @@ class AzureConnector(FileSystemConnector):
         depth = len(parts)
 
         if depth == 1:
-            return get_svg_icon("Subscriptions.svg") or ('mdi.shield-key', '#F2C811') 
+            return get_svg_icon("Subscriptions.svg") or ('mdi.shield-key', '#F2C811')
         if depth == 2:
-            return get_svg_icon("Storage_Accounts.svg") or ('mdi.server', '#008AD7') 
+            return get_svg_icon("Storage_Accounts.svg") or ('mdi.server', '#008AD7')
         if depth == 3:
             return get_svg_icon("Container.svg") or ('mdi.package-variant-closed', '#E85E00')
         if is_dir:
+            if depth >= 4 and self.is_delta_table(path):
+                delta_icon = _delta_icon()
+                if delta_icon is not None:
+                    return delta_icon
             return ('fa5s.folder', 'goldenrod')
 
         return None
+
+    def is_delta_table(self, path: str) -> bool:
+        """Return True if the Azure path points at a Delta Lake table.
+
+        Detection probes for a single blob under ``<container>/<blob_path>/_delta_log/``
+        via the Blob List REST API with ``maxresults=1``. Results are cached on
+        ``self.delta_table_cache`` to avoid repeated probes during tree refresh.
+        Returns False for non-blob paths (subscription/account/container roots).
+        """
+        if not path:
+            return False
+        if path in self.delta_table_cache:
+            return self.delta_table_cache[path]
+
+        parts = path.strip('/').split('/')
+        # Need at least subscription/account/container/blob_path to be a candidate.
+        if len(parts) < 4:
+            self.delta_table_cache[path] = False
+            return False
+
+        account_name = parts[1]
+        container_name = parts[2]
+        blob_path = "/".join(parts[3:])
+        prefix = f"{blob_path}/_delta_log/"
+
+        try:
+            token = self._get_storage_token()
+            url = (
+                f"https://{account_name}.blob.core.windows.net/{container_name}"
+                f"?restype=container&comp=list&maxresults=1&prefix={prefix}"
+            )
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "x-ms-version": "2020-02-10",
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code != 200:
+                self.delta_table_cache[path] = False
+                return False
+            root = ET.fromstring(response.content)
+            found = root.find(".//Blob") is not None
+            self.delta_table_cache[path] = found
+            return found
+        except Exception:
+            logger.debug("Delta detection failed for %s.", path, exc_info=True)
+            self.delta_table_cache[path] = False
+            return False
 
     def get_storage_protocol(self, account_name: str) -> tuple[str, str]:
         """Returns (protocol, endpoint) based on whether HNS is enabled."""
