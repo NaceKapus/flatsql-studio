@@ -655,7 +655,7 @@ class TestUiScalingRegressions:
 
         dialog = SettingsDialog(
             {},
-            {"dark.json": "Dark"},
+            [{"filename": "dark.json", "name": "Dark", "variant": "dark"}],
             SQLGenerator.CONVERSION_FORMATS,
         )
         dialog.show()

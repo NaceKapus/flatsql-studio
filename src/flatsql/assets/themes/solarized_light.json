@@ -1,7 +1,8 @@
 ﻿{
     "name": "Solarized Light",
     "description": "Precision warm beige theme designed to reduce eye strain.",
-    "sort_order": 11,
+    "variant": "light",
+    "sort_order": 4,
     "palette": {
         "Window": "#EEE8D5",
         "WindowText": "#586E75",

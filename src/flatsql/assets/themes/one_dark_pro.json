@@ -1,7 +1,8 @@
 ﻿{
     "name": "One Dark Pro",
     "description": "Atom is iconic dark theme with subtle, easy-on-the-eyes contrasts.",
-    "sort_order": 10,
+    "variant": "dark",
+    "sort_order": 18,
     "palette": {
         "Window": "#21252b",
         "WindowText": "#abb2bf",

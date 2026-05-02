@@ -1,7 +1,8 @@
 ﻿{
     "name": "Monokai",
     "description": "A classic high-contrast dark theme with vibrant colors.",
-    "sort_order": 8,
+    "variant": "dark",
+    "sort_order": 16,
     "palette": {
         "Window": "#1e1f1c",
         "WindowText": "#f8f8f2",

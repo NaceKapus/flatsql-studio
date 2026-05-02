@@ -1,7 +1,8 @@
 ﻿{
     "name": "Dracula",
     "description": "A dark theme for vampires with high contrast neon accents.",
-    "sort_order": 4,
+    "variant": "dark",
+    "sort_order": 13,
     "palette": {
         "Window": "#21222c",
         "WindowText": "#f8f8f2",
