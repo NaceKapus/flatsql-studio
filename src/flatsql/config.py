@@ -38,7 +38,7 @@ USER_SQLFLUFF_PATH = os.path.join(USER_DATA_DIR, "sqlfluff.cfg")
 os.makedirs(USER_DATA_DIR, exist_ok=True)
 
 DOCS_URL = "https://docs.flatsql.com"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 
 def configure_startup_display() -> None:

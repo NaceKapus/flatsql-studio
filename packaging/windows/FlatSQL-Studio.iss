@@ -2,7 +2,7 @@
 ; Compiled by GitHub Actions; ISCC is pre-installed on windows-latest runners.
 
 #define MyAppName "FlatSQL Studio"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "FlatSQL"
 #define MyAppURL "https://github.com/NaceKapus/FlatSQL"
 #define MyAppExeName "FlatSQL-Studio.exe"
