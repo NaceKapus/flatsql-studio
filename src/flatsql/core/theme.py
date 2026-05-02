@@ -24,28 +24,38 @@ class ThemeManager:
             raise ValueError(f"Could not load or parse theme file: {theme_path}")
 
     @staticmethod
-    def discover_themes(theme_dir: str = THEMES_DIR) -> dict[str, str]:
-        """Return available themes keyed by filename in display order."""
-        themes_with_order: list[dict[str, Any]] = []
-        for filename in os.listdir(theme_dir):
-            if filename.endswith('.json'):
-                path = os.path.join(theme_dir, filename)
-                try:
-                    with open(path, 'r', encoding='utf-8-sig') as f:
-                        data = json.load(f)
-                        if 'name' in data:
-                            sort_order = data.get('sort_order', 99)
-                            themes_with_order.append({
-                                'filename': filename,
-                                'name': data['name'],
-                                'order': sort_order
-                            })
-                except (json.JSONDecodeError, IOError) as e:
-                    logger.warning("Could not load theme %s.", filename, exc_info=e)
+    def discover_themes(theme_dir: str = THEMES_DIR) -> list[dict[str, str]]:
+        """Return available themes in display order with filename, name, and variant.
 
-        sorted_themes = sorted(themes_with_order, key=lambda t: t['order'])
-        themes = {theme['filename']: theme['name'] for theme in sorted_themes}
-        return themes
+        Light themes are listed before dark themes (any unknown variant comes last).
+        Within a variant, the per-theme ``sort_order`` field controls placement.
+        """
+        themes: list[dict[str, Any]] = []
+        for filename in os.listdir(theme_dir):
+            if not filename.endswith('.json'):
+                continue
+            path = os.path.join(theme_dir, filename)
+            try:
+                with open(path, 'r', encoding='utf-8-sig') as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                logger.warning("Could not load theme %s.", filename, exc_info=e)
+                continue
+            if 'name' not in data:
+                continue
+            themes.append({
+                'filename': filename,
+                'name': data['name'],
+                'variant': data.get('variant', 'dark'),
+                'order': data.get('sort_order', 99),
+            })
+
+        variant_rank = {'light': 0, 'dark': 1}
+        themes.sort(key=lambda t: (variant_rank.get(t['variant'], 2), t['order']))
+        return [
+            {'filename': t['filename'], 'name': t['name'], 'variant': t['variant']}
+            for t in themes
+        ]
 
     def _load_theme(self, theme_path: str) -> dict[str, Any] | None:
         """Load and parse a theme file from disk."""

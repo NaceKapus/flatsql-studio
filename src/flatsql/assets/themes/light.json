@@ -1,6 +1,7 @@
 ﻿{
     "name": "FlatSQL Studio Light",
     "description": "Rebuilt light theme derived from the dark theme with inverted surfaces and blue accents.",
+    "variant": "light",
     "sort_order": 1,
     "palette": {
         "Window": "#F3F4F6",
