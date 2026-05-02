@@ -1,7 +1,8 @@
 ﻿{
     "name": "FlatSQL Studio Dark",
     "description": "Modern dark theme with blue accents.",
-    "sort_order": 2,
+    "variant": "dark",
+    "sort_order": 10,
     "palette": {
         "Window": "#252526",
         "WindowText": "#CCCCCC",

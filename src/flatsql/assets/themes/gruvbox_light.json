@@ -1,7 +1,8 @@
 ﻿{
     "name": "Gruvbox Light",
     "description": "Retro groove color scheme with warm, earthy light tones.",
-    "sort_order": 5,
+    "variant": "light",
+    "sort_order": 2,
     "palette": {
         "Window": "#f2e5bc",
         "WindowText": "#3c3836",

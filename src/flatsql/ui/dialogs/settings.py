@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QGuiApplication, QIntValidator, QKeySequence
+from PySide6.QtGui import QGuiApplication, QIntValidator, QKeySequence, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -40,15 +40,16 @@ class SettingsDialog(QDialog):
     def __init__(
         self,
         settings_data: dict,
-        available_themes: dict[str, str],
+        available_themes: list[dict[str, str]],
         conversion_formats: dict,
         parent: QWidget | None = None,
     ) -> None:
         """Initialize the settings dialog.
-        
+
         Args:
             settings_data: Dictionary of current setting values.
-            available_themes: Dictionary mapping theme file names to display names.
+            available_themes: Themes in display order, each with ``filename``,
+                ``name``, and ``variant`` ("light" or "dark") keys.
             conversion_formats: Dictionary of available export format configurations.
             parent: Parent widget (optional).
         """
@@ -167,11 +168,32 @@ class SettingsDialog(QDialog):
         self._configure_form_layout(layout)
 
         self.theme_combo = DownwardComboBox()
-        for theme_file, theme_name in self.available_themes.items():
-            self.theme_combo.addItem(theme_name, theme_file)
+        theme_model = QStandardItemModel(self.theme_combo)
+        self.theme_combo.setModel(theme_model)
+
+        variant_labels = {"light": "Light Themes", "dark": "Dark Themes"}
+        current_variant: str | None = None
+        for theme in self.available_themes:
+            variant = theme.get("variant", "dark")
+            if variant != current_variant:
+                header = QStandardItem(variant_labels.get(variant, variant.title()))
+                header.setFlags(Qt.NoItemFlags)
+                header_font = header.font()
+                header_font.setBold(True)
+                header.setFont(header_font)
+                theme_model.appendRow(header)
+                current_variant = variant
+            item = QStandardItem(theme["name"])
+            item.setData(theme["filename"], Qt.UserRole)
+            theme_model.appendRow(item)
 
         current_theme = self.settings_data.get("theme", "dark.json")
         current_index = self.theme_combo.findData(current_theme)
+        if current_index == -1:
+            for i in range(self.theme_combo.count()):
+                if self.theme_combo.itemData(i) is not None:
+                    current_index = i
+                    break
         if current_index != -1:
             self.theme_combo.setCurrentIndex(current_index)
 
