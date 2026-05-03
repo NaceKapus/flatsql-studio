@@ -6,6 +6,7 @@ with context menus for file operations, favorites pinning, and schema inspection
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import qtawesome as qta
@@ -306,6 +307,22 @@ class FileExplorerPanel(QFrame):
 
             files = connector.list_files(engine, path_to_list)
 
+            # Probe Delta-table status for all child directories in parallel.
+            # On Azure each probe is a REST call (~100-300ms); doing 50 of them
+            # sequentially makes container expansion painfully slow. Threading
+            # is safe — Azure SDK token cache and `requests.get` are thread-safe.
+            delta_flags: dict[str, bool] = {}
+            if hasattr(connector, 'is_delta_table'):
+                dir_paths = [fp for _, ft, fp in files if ft == 'directory']
+                is_azure = isinstance(connector, AzureConnector)
+                if dir_paths and is_azure:
+                    with ThreadPoolExecutor(max_workers=8) as pool:
+                        for fp, is_delta in zip(dir_paths, pool.map(connector.is_delta_table, dir_paths)):
+                            delta_flags[fp] = is_delta
+                elif dir_paths:
+                    for fp in dir_paths:
+                        delta_flags[fp] = connector.is_delta_table(fp)
+
             for display_name, file_type, full_path in sorted(files, key=lambda x: (0 if x[1] == 'directory' else 1, x[0].lower())):
                 icon = None
                 icon_info = connector.get_icon_info(full_path, file_type == 'directory') if hasattr(connector, 'get_icon_info') else None
@@ -326,11 +343,7 @@ class FileExplorerPanel(QFrame):
                         icon_color = self.theme_colors.get('icon', '#6C757D')
                         icon = qta.icon('fa5s.folder', color='goldenrod') if file_type == 'directory' else qta.icon('fa5s.file', color=icon_color)
 
-                is_delta_table = (
-                    file_type == 'directory'
-                    and hasattr(connector, 'is_delta_table')
-                    and connector.is_delta_table(full_path)
-                )
+                is_delta_table = file_type == 'directory' and delta_flags.get(full_path, False)
 
                 child_item = QStandardItem(icon, display_name)
                 if file_type == 'directory' and not is_delta_table:

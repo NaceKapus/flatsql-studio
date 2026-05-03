@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 import os
+import re
+
+
+_AZURE_FLATSQL_URI_PATTERN = re.compile(
+    r'^(?P<scheme>abfss?|az)://(?P<account>[^/@]+)\.(?P<host>(?:dfs|blob)\.core\.windows\.net)/(?P<container>[^/]+)/(?P<blob>.*)$'
+)
 
 
 _CSV_DELIMITER_BY_EXTENSION = {
@@ -60,6 +66,29 @@ def to_duckdb_relation(path_value: str | os.PathLike[str]) -> str:
     return f"'{escaped_path}'"
 
 
+def _to_delta_kernel_uri(uri: str) -> str:
+    """Rewrite Azure URLs into the ``container@account`` form expected by delta-kernel.
+
+    DuckDB's delta extension uses delta-kernel + the Rust ``object_store`` crate,
+    which parses Azure URLs as ``abfss://<container>@<account>.dfs.core.windows.net/<blob>``
+    (and analogously for ``az://``). The Azure extension itself happily accepts
+    ``abfss://<account>.dfs.core.windows.net/<container>/<blob>``, but the delta
+    extension does not — passing the Azure-extension form to ``delta_scan`` raises
+    ``URL did not match any known pattern for scheme: abfss://``.
+
+    Non-Azure URIs (local paths, ``s3://``, ``https://``) are returned unchanged.
+    """
+    match = _AZURE_FLATSQL_URI_PATTERN.match(uri)
+    if not match:
+        return uri
+    scheme = match.group("scheme")
+    account = match.group("account")
+    host = match.group("host")
+    container = match.group("container")
+    blob = match.group("blob")
+    return f"{scheme}://{container}@{account}.{host}/{blob}"
+
+
 def to_duckdb_delta_relation(path_value: str | os.PathLike[str], version: int | None = None) -> str:
     """Return a ``delta_scan(...)`` relation expression for a Delta table path.
 
@@ -73,7 +102,8 @@ def to_duckdb_delta_relation(path_value: str | os.PathLike[str], version: int | 
         SQL relation expression suitable for a FROM clause.
     """
     normalized_path = to_duckdb_path(path_value)
-    escaped_path = normalized_path.replace("'", "''")
+    delta_path = _to_delta_kernel_uri(normalized_path)
+    escaped_path = delta_path.replace("'", "''")
     if version is not None:
         return f"delta_scan('{escaped_path}', version={int(version)})"
     return f"delta_scan('{escaped_path}')"

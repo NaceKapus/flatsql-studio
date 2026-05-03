@@ -139,11 +139,32 @@ class TestToDuckdbDeltaRelation:
             "delta_scan('C:/Bobby''s Data/my_delta')"
         )
 
-    def test_abfss_path_passthrough(self) -> None:
+    def test_abfss_path_rewritten_for_delta_kernel(self) -> None:
+        """Delta-kernel needs ``container@account`` form, not ``account/container``."""
         from flatsql.core.path_utils import to_duckdb_delta_relation
 
         result = to_duckdb_delta_relation("abfss://acct.dfs.core.windows.net/container/my_delta")
-        assert result == "delta_scan('abfss://acct.dfs.core.windows.net/container/my_delta')"
+        assert result == "delta_scan('abfss://container@acct.dfs.core.windows.net/my_delta')"
+
+    def test_abfss_path_with_nested_blob_path(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        result = to_duckdb_delta_relation(
+            "abfss://acct.dfs.core.windows.net/gold/datasets/Customer"
+        )
+        assert result == "delta_scan('abfss://gold@acct.dfs.core.windows.net/datasets/Customer')"
+
+    def test_az_path_rewritten_for_delta_kernel(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        result = to_duckdb_delta_relation("az://acct.blob.core.windows.net/container/my_delta")
+        assert result == "delta_scan('az://container@acct.blob.core.windows.net/my_delta')"
+
+    def test_local_path_unaffected_by_kernel_rewrite(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        # Local paths don't match the Azure pattern; they pass through unchanged.
+        assert to_duckdb_delta_relation("C:/data/my_delta") == "delta_scan('C:/data/my_delta')"
 
 
 class TestIsDeltaTableLocal:
