@@ -45,20 +45,9 @@ class FlatEngine:
         self._lock = threading.Lock()
         self._autocomplete_install_attempted = False
         try:
-            self.main_con.execute("INSTALL delta;")
+            self.main_con.execute("INSTALL delta; LOAD delta;")
         except Exception:
             logger.debug("DuckDB delta extension is unavailable.", exc_info=True)
-        try:
-            # Best-effort upgrade so cached older delta builds pick up newer
-            # features (e.g. the ``version`` time-travel parameter). Silent
-            # no-op on older DuckDB versions that don't have UPDATE EXTENSIONS.
-            self.main_con.execute("UPDATE EXTENSIONS (delta);")
-        except Exception:
-            logger.debug("UPDATE EXTENSIONS (delta) is unavailable.", exc_info=True)
-        try:
-            self.main_con.execute("LOAD delta;")
-        except Exception:
-            logger.debug("DuckDB delta extension failed to load.", exc_info=True)
         logger.info("Initialized DuckDB engine for %s.", self.db_name)
 
     def _ensure_autocomplete_loaded(self, connection: duckdb.DuckDBPyConnection) -> bool:
