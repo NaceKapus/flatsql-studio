@@ -89,21 +89,34 @@ def _to_delta_kernel_uri(uri: str) -> str:
     return f"{scheme}://{container}@{account}.{host}/{blob}"
 
 
-def to_duckdb_delta_relation(path_value: str | os.PathLike[str], version: int | None = None) -> str:
+def to_duckdb_delta_relation(path_value: str | os.PathLike[str]) -> str:
     """Return a ``delta_scan(...)`` relation expression for a Delta table path.
 
     Args:
         path_value: Path to a Delta table directory (the directory containing
             ``_delta_log/``), local or remote (e.g. ``abfss://``, ``az://``).
-        version: Optional Delta version for time-travel queries. When provided,
-            emits ``delta_scan('path', version=N)``.
 
     Returns:
         SQL relation expression suitable for a FROM clause.
+
+    Note:
+        Time-travel is *not* a named parameter on ``delta_scan()`` — DuckDB
+        exposes it as the SQL standard ``AT (VERSION => N)`` clause, which
+        requires the table to be ATTACHed. See
+        :func:`to_duckdb_delta_attach_path` for the ATTACH path helper.
     """
     normalized_path = to_duckdb_path(path_value)
     delta_path = _to_delta_kernel_uri(normalized_path)
     escaped_path = delta_path.replace("'", "''")
-    if version is not None:
-        return f"delta_scan('{escaped_path}', version={int(version)})"
     return f"delta_scan('{escaped_path}')"
+
+
+def to_duckdb_delta_attach_path(path_value: str | os.PathLike[str]) -> str:
+    """Return a Delta-table path ready to embed in an ``ATTACH '<...>'`` clause.
+
+    Normalizes separators, rewrites Azure URLs to the ``container@account``
+    form expected by delta-kernel, and SQL-escapes any single quotes.
+    """
+    normalized_path = to_duckdb_path(path_value)
+    delta_path = _to_delta_kernel_uri(normalized_path)
+    return delta_path.replace("'", "''")

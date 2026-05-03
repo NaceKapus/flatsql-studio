@@ -115,22 +115,10 @@ class TestToDuckdbRelation:
 class TestToDuckdbDeltaRelation:
     """to_duckdb_delta_relation emits a delta_scan() FROM expression."""
 
-    def test_basic_relation_no_version(self) -> None:
+    def test_basic_relation(self) -> None:
         from flatsql.core.path_utils import to_duckdb_delta_relation
 
         assert to_duckdb_delta_relation("C:\\data\\my_delta") == "delta_scan('C:/data/my_delta')"
-
-    def test_relation_with_version(self) -> None:
-        from flatsql.core.path_utils import to_duckdb_delta_relation
-
-        assert to_duckdb_delta_relation("C:/data/my_delta", version=3) == (
-            "delta_scan('C:/data/my_delta', version=3)"
-        )
-
-    def test_version_zero_emits_zero(self) -> None:
-        from flatsql.core.path_utils import to_duckdb_delta_relation
-
-        assert to_duckdb_delta_relation("C:/data/my_delta", version=0).endswith("version=0)")
 
     def test_path_with_apostrophe_is_escaped(self) -> None:
         from flatsql.core.path_utils import to_duckdb_delta_relation
@@ -165,6 +153,27 @@ class TestToDuckdbDeltaRelation:
 
         # Local paths don't match the Azure pattern; they pass through unchanged.
         assert to_duckdb_delta_relation("C:/data/my_delta") == "delta_scan('C:/data/my_delta')"
+
+
+class TestToDuckdbDeltaAttachPath:
+    """to_duckdb_delta_attach_path returns a path string ready for ATTACH."""
+
+    def test_local_path_normalized(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_attach_path
+
+        assert to_duckdb_delta_attach_path("C:\\data\\my_delta") == "C:/data/my_delta"
+
+    def test_apostrophe_escaped(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_attach_path
+
+        assert to_duckdb_delta_attach_path("C:/Bobby's Data/my_delta") == "C:/Bobby''s Data/my_delta"
+
+    def test_abfss_rewritten(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_attach_path
+
+        assert to_duckdb_delta_attach_path(
+            "abfss://acct.dfs.core.windows.net/gold/DimActivity"
+        ) == "abfss://gold@acct.dfs.core.windows.net/DimActivity"
 
 
 class TestIsDeltaTableLocal:
