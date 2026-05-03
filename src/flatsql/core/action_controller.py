@@ -11,7 +11,12 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 
 from flatsql.config import SNIPPETS_DIR, LOG_PATH
-from flatsql.core.path_utils import to_duckdb_delta_relation, to_duckdb_path, to_duckdb_relation
+from flatsql.core.path_utils import (
+    to_duckdb_delta_attach_path,
+    to_duckdb_delta_relation,
+    to_duckdb_path,
+    to_duckdb_relation,
+)
 from flatsql.core.sql_generator import SQLGenerator
 from flatsql.core.sqlfluff_config import write_user_sqlfluff_config
 from flatsql.core.exporter import DataExporter
@@ -425,8 +430,12 @@ class ActionController:
     def script_and_open_select_delta(self, path: str, name: str, version: int | None = None) -> None:
         """Generate and run a SELECT against a Delta table at ``path``.
 
-        If ``version`` is provided, queries that specific Delta version
-        (``delta_scan('path', version=N)``).
+        Without ``version``, emits an inline ``delta_scan('path')`` query.
+        With ``version``, uses the SQL-standard time-travel form which
+        requires the table to be ATTACHed first:
+
+            ATTACH IF NOT EXISTS '<path>' AS "<name>" (TYPE DELTA);
+            SELECT * FROM "<name>" AT (VERSION => N) LIMIT M;
         """
         active_editor = self.mw.query_panel.get_active_editor()
         connection_key = None
@@ -450,10 +459,20 @@ class ActionController:
         editor = self.mw.query_panel.get_active_editor()
         QApplication.processEvents()
 
-        from_clause = to_duckdb_delta_relation(path, version=version)
-        columns = engine.get_columns_for_file(path, relation_override=from_clause)
+        if version is None:
+            from_clause = to_duckdb_delta_relation(path)
+            columns = engine.get_columns_for_file(path, relation_override=from_clause)
+            query = SQLGenerator.generate_select_top(columns, from_clause, self._preview_row_limit())
+        else:
+            attach_path = to_duckdb_delta_attach_path(path)
+            quoted_alias = '"' + name.replace('"', '""') + '"'
+            limit = self._preview_row_limit()
+            limit_clause = f"\nLIMIT {limit}" if limit and limit > 0 else ""
+            query = (
+                f"ATTACH IF NOT EXISTS '{attach_path}' AS {quoted_alias} (TYPE DELTA);\n\n"
+                f"SELECT *\nFROM {quoted_alias} AT (VERSION => {int(version)}){limit_clause};"
+            )
 
-        query = SQLGenerator.generate_select_top(columns, from_clause, self._preview_row_limit())
         formatted_query = self.format_sql_string(query)
 
         if editor:
