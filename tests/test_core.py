@@ -112,6 +112,103 @@ class TestToDuckdbRelation:
         )
 
 
+class TestToDuckdbDeltaRelation:
+    """to_duckdb_delta_relation emits a delta_scan() FROM expression."""
+
+    def test_basic_relation(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        assert to_duckdb_delta_relation("C:\\data\\my_delta") == "delta_scan('C:/data/my_delta')"
+
+    def test_path_with_apostrophe_is_escaped(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        assert to_duckdb_delta_relation("C:/Bobby's Data/my_delta") == (
+            "delta_scan('C:/Bobby''s Data/my_delta')"
+        )
+
+    def test_abfss_path_rewritten_for_delta_kernel(self) -> None:
+        """Delta-kernel needs ``container@account`` form, not ``account/container``."""
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        result = to_duckdb_delta_relation("abfss://acct.dfs.core.windows.net/container/my_delta")
+        assert result == "delta_scan('abfss://container@acct.dfs.core.windows.net/my_delta')"
+
+    def test_abfss_path_with_nested_blob_path(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        result = to_duckdb_delta_relation(
+            "abfss://acct.dfs.core.windows.net/gold/datasets/Customer"
+        )
+        assert result == "delta_scan('abfss://gold@acct.dfs.core.windows.net/datasets/Customer')"
+
+    def test_az_path_rewritten_for_delta_kernel(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        result = to_duckdb_delta_relation("az://acct.blob.core.windows.net/container/my_delta")
+        assert result == "delta_scan('az://container@acct.blob.core.windows.net/my_delta')"
+
+    def test_local_path_unaffected_by_kernel_rewrite(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_relation
+
+        # Local paths don't match the Azure pattern; they pass through unchanged.
+        assert to_duckdb_delta_relation("C:/data/my_delta") == "delta_scan('C:/data/my_delta')"
+
+
+class TestToDuckdbDeltaAttachPath:
+    """to_duckdb_delta_attach_path returns a path string ready for ATTACH."""
+
+    def test_local_path_normalized(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_attach_path
+
+        assert to_duckdb_delta_attach_path("C:\\data\\my_delta") == "C:/data/my_delta"
+
+    def test_apostrophe_escaped(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_attach_path
+
+        assert to_duckdb_delta_attach_path("C:/Bobby's Data/my_delta") == "C:/Bobby''s Data/my_delta"
+
+    def test_abfss_rewritten(self) -> None:
+        from flatsql.core.path_utils import to_duckdb_delta_attach_path
+
+        assert to_duckdb_delta_attach_path(
+            "abfss://acct.dfs.core.windows.net/gold/DimActivity"
+        ) == "abfss://gold@acct.dfs.core.windows.net/DimActivity"
+
+
+class TestIsDeltaTableLocal:
+    """LocalFileSystemConnector.is_delta_table detects _delta_log/ subfolders."""
+
+    def test_directory_with_delta_log_returns_true(self, tmp_path: Path) -> None:
+        from flatsql.core.connector import LocalFileSystemConnector
+
+        delta_dir = tmp_path / "my_delta"
+        (delta_dir / "_delta_log").mkdir(parents=True)
+
+        connector = LocalFileSystemConnector()
+        assert connector.is_delta_table(str(delta_dir)) is True
+
+    def test_directory_without_delta_log_returns_false(self, tmp_path: Path) -> None:
+        from flatsql.core.connector import LocalFileSystemConnector
+
+        plain_dir = tmp_path / "plain"
+        plain_dir.mkdir()
+
+        connector = LocalFileSystemConnector()
+        assert connector.is_delta_table(str(plain_dir)) is False
+
+    def test_empty_path_returns_false(self) -> None:
+        from flatsql.core.connector import LocalFileSystemConnector
+
+        assert LocalFileSystemConnector().is_delta_table("") is False
+
+    def test_nonexistent_path_returns_false(self, tmp_path: Path) -> None:
+        from flatsql.core.connector import LocalFileSystemConnector
+
+        connector = LocalFileSystemConnector()
+        assert connector.is_delta_table(str(tmp_path / "does_not_exist")) is False
+
+
 # ---------------------------------------------------------------------------
 # SQLGenerator
 # ---------------------------------------------------------------------------

@@ -146,7 +146,7 @@
             "border-bottom": "1px solid #1c212b"
         },
         "QSplitter::handle": {
-            "background": "#1c212b"
+            "background": "#2d3a4d"
         },
         "QLineEdit": {
             "background-color": "#1c212b",

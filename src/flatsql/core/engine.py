@@ -44,6 +44,10 @@ class FlatEngine:
         self.worker_con: duckdb.DuckDBPyConnection | None = None
         self._lock = threading.Lock()
         self._autocomplete_install_attempted = False
+        try:
+            self.main_con.execute("INSTALL delta; LOAD delta;")
+        except Exception:
+            logger.debug("DuckDB delta extension is unavailable.", exc_info=True)
         logger.info("Initialized DuckDB engine for %s.", self.db_name)
 
     def _ensure_autocomplete_loaded(self, connection: duckdb.DuckDBPyConnection) -> bool:
@@ -144,10 +148,15 @@ class FlatEngine:
 
         return keywords, functions
 
-    def get_schema_for_file(self, file_path: str) -> list[tuple[str, str]]:
-        """Infer and return the full column schema for a file-backed dataset."""
+    def get_schema_for_file(self, file_path: str, relation_override: str | None = None) -> list[tuple[str, str]]:
+        """Infer and return the full column schema for a file-backed dataset.
+
+        ``relation_override`` (e.g. ``delta_scan('path')``) takes precedence over
+        the default reader inferred from the file extension.
+        """
+        relation = relation_override or to_duckdb_relation(file_path)
         try:
-            query = f"DESCRIBE SELECT * FROM {to_duckdb_relation(file_path)} LIMIT 0;"
+            query = f"DESCRIBE SELECT * FROM {relation} LIMIT 0;"
             schema_df = self.main_con.execute(query).pl()
             return list(zip(schema_df['column_name'], schema_df['column_type']))
         except Exception:
@@ -416,14 +425,56 @@ class FlatEngine:
 
         return f"-- DDL generation not supported for script type '{script_type}' on object type '{object_type}'."
 
-    def get_columns_for_file(self, file_path: str) -> list[str]:
-        """Infer and return column names for a file-backed dataset."""
+    def get_columns_for_file(self, file_path: str, relation_override: str | None = None) -> list[str]:
+        """Infer and return column names for a file-backed dataset.
+
+        ``relation_override`` (e.g. ``delta_scan('path')``) takes precedence over
+        the default reader inferred from the file extension.
+        """
+        relation = relation_override or to_duckdb_relation(file_path)
         try:
-            query = f"DESCRIBE SELECT * FROM {to_duckdb_relation(file_path)} LIMIT 0;"
+            query = f"DESCRIBE SELECT * FROM {relation} LIMIT 0;"
             columns_df = self.main_con.execute(query).pl()
             return columns_df['column_name'].to_list()
         except Exception:
             logger.exception("Failed to fetch columns for file %s.", file_path)
+            return []
+
+    def get_delta_history(self, table_path: str) -> list[dict[str, Any]]:
+        """Return the commit history of a Delta table by reading its ``_delta_log/``.
+
+        Each entry corresponds to one committed version and includes ``version``
+        (int), ``commit_time`` (datetime), ``operation`` (str), and
+        ``operation_parameters`` (dict). Returns an empty list on error.
+
+        Reads ``<table_path>/_delta_log/*.json`` via DuckDB's ``read_json``;
+        works for both local paths and remote URIs (``abfss://``, ``az://``)
+        when the appropriate extensions are loaded.
+        """
+        from flatsql.core.path_utils import to_duckdb_path
+
+        normalized = to_duckdb_path(table_path)
+        escaped = normalized.replace("'", "''")
+        log_glob = f"{escaped}/_delta_log/*.json"
+
+        query = f"""
+        SELECT
+            CAST(regexp_extract(filename, '(\\d+)\\.json$', 1) AS BIGINT) AS version,
+            to_timestamp(commitInfo.timestamp / 1000) AS commit_time,
+            commitInfo.operation AS operation,
+            commitInfo.operationParameters AS operation_parameters
+        FROM read_json('{log_glob}',
+                       filename = true,
+                       format = 'nd',
+                       union_by_name = true)
+        WHERE commitInfo IS NOT NULL
+        ORDER BY version DESC;
+        """
+        try:
+            df = self.main_con.execute(query).pl()
+            return df.to_dicts()
+        except Exception:
+            logger.exception("Failed to read Delta history at %s.", table_path)
             return []
 
     def _apply_runtime_settings(self, settings: dict[str, Any]) -> None:
