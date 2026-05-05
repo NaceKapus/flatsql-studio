@@ -212,6 +212,10 @@ class MainWindow(QMainWindow):
         self.file_explorer_panel.action_create_view.connect(self.action_controller.create_view_from_file)
         self.file_explorer_panel.action_merge_folder.connect(self.action_controller.show_merge_dialog)
         self.file_explorer_panel.action_select_folder.connect(self.action_controller.select_from_folder)
+        self.file_explorer_panel.action_script_select_delta.connect(self.action_controller.script_and_open_select_delta)
+        self.file_explorer_panel.action_script_select_delta_version.connect(self.action_controller.script_and_open_select_delta_version)
+        self.file_explorer_panel.action_show_schema_delta.connect(self.action_controller.show_schema_delta)
+        self.file_explorer_panel.action_show_stats_delta.connect(self.action_controller.show_statistics_delta)
 
         self.query_panel.run_query_requested.connect(self.action_controller.execute_query)
         self.query_panel.stop_query_requested.connect(self.action_controller.stop_query)

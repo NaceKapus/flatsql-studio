@@ -11,7 +11,12 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 
 from flatsql.config import SNIPPETS_DIR, LOG_PATH
-from flatsql.core.path_utils import to_duckdb_path, to_duckdb_relation
+from flatsql.core.path_utils import (
+    to_duckdb_delta_attach_path,
+    to_duckdb_delta_relation,
+    to_duckdb_path,
+    to_duckdb_relation,
+)
 from flatsql.core.sql_generator import SQLGenerator
 from flatsql.core.sqlfluff_config import write_user_sqlfluff_config
 from flatsql.core.exporter import DataExporter
@@ -420,6 +425,101 @@ class ActionController:
         formatted_query = self.format_sql_string(query)
 
         if editor: editor.setPlainText(formatted_query)
+        self.execute_query()
+
+    def script_and_open_select_delta(self, path: str, name: str, version: int | None = None) -> None:
+        """Generate and run a SELECT against a Delta table at ``path``.
+
+        Without ``version``, emits an inline ``delta_scan('path')`` query.
+        With ``version``, uses the SQL-standard time-travel form which
+        requires the table to be ATTACHed first:
+
+            ATTACH IF NOT EXISTS '<path>' AS "<name>" (TYPE DELTA);
+            SELECT * FROM "<name>" AT (VERSION => N) LIMIT M;
+        """
+        active_editor = self.mw.query_panel.get_active_editor()
+        connection_key = None
+        if isinstance(active_editor, QueryTextEdit) and getattr(active_editor, 'connection_key', None):
+            connection_key = active_editor.connection_key
+        elif ":memory:" in self.mw.conn_manager.db_connections:
+            connection_key = ":memory:"
+
+        if not connection_key:
+            QMessageBox.warning(self.mw, "No Connection", "Cannot generate script without an active connection.")
+            return
+
+        engine = self.mw.conn_manager.get_db(connection_key)
+        if not engine:
+            QMessageBox.critical(self.mw, "Connection Error", "The active connection is invalid.")
+            return
+
+        version_suffix = f"_v{version}" if version is not None else ""
+        tab_name = f"SELECT_{name}{version_suffix}"
+        self.mw.query_panel.add_new_tab(content="-- GENERATING SQL...", tab_name=tab_name, connection_key=connection_key)
+        editor = self.mw.query_panel.get_active_editor()
+        QApplication.processEvents()
+
+        if version is None:
+            from_clause = to_duckdb_delta_relation(path)
+            columns = engine.get_columns_for_file(path, relation_override=from_clause)
+            query = SQLGenerator.generate_select_top(columns, from_clause, self._preview_row_limit())
+        else:
+            attach_path = to_duckdb_delta_attach_path(path)
+            quoted_alias = '"' + name.replace('"', '""') + '"'
+            limit = self._preview_row_limit()
+            limit_clause = f"\nLIMIT {limit}" if limit and limit > 0 else ""
+            query = (
+                f"ATTACH IF NOT EXISTS '{attach_path}' AS {quoted_alias} (TYPE DELTA);\n\n"
+                f"SELECT *\nFROM {quoted_alias} AT (VERSION => {int(version)}){limit_clause};"
+            )
+
+        formatted_query = self.format_sql_string(query)
+
+        if editor:
+            editor.setPlainText(formatted_query)
+        self.execute_query()
+
+    def script_and_open_select_delta_version(self, path: str, name: str) -> None:
+        """Open the Delta version-picker dialog and run a SELECT against the chosen version."""
+        from flatsql.ui.dialogs.delta_version_picker import DeltaVersionPickerDialog
+
+        active_editor = self.mw.query_panel.get_active_editor()
+        connection_key = None
+        if isinstance(active_editor, QueryTextEdit) and getattr(active_editor, 'connection_key', None):
+            connection_key = active_editor.connection_key
+        elif ":memory:" in self.mw.conn_manager.db_connections:
+            connection_key = ":memory:"
+
+        if not connection_key:
+            QMessageBox.warning(self.mw, "No Connection", "Cannot read Delta history without an active connection.")
+            return
+
+        engine = self.mw.conn_manager.get_db(connection_key)
+        if not engine:
+            QMessageBox.critical(self.mw, "Connection Error", "The active connection is invalid.")
+            return
+
+        history = engine.get_delta_history(path)
+        dialog = DeltaVersionPickerDialog(history, name, self.mw)
+        if dialog.exec() == QDialog.Accepted:
+            version = dialog.selected_version()
+            if version is not None:
+                self.script_and_open_select_delta(path, name, version=version)
+
+    def show_schema_delta(self, path: str, name: str) -> None:
+        """Run a DESCRIBE query for a Delta table."""
+        delta_relation = to_duckdb_delta_relation(path)
+        query = f"DESCRIBE SELECT * FROM {delta_relation};"
+        tab_name = f"Schema: {name}"
+        self.mw.query_panel.add_new_tab(content=query, tab_name=tab_name)
+        self.execute_query()
+
+    def show_statistics_delta(self, path: str, name: str) -> None:
+        """Run a SUMMARIZE query for a Delta table."""
+        delta_relation = to_duckdb_delta_relation(path)
+        query = f"SUMMARIZE SELECT * FROM {delta_relation};"
+        tab_name = f"Stats: {name}"
+        self.mw.query_panel.add_new_tab(content=query, tab_name=tab_name)
         self.execute_query()
 
     def create_and_run_query_for_file(
