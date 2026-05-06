@@ -16,11 +16,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLayout,
+    QListView,
     QListWidget,
     QProgressBar,
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStyle,
+    QStyledItemDelegate,
     QTabWidget,
     QTreeView,
     QVBoxLayout,
@@ -177,14 +180,92 @@ class MultiselectComboBox(DownwardComboBox):
             self.lineEdit().setText(f"{self.title} ({checked_count} selected)")
 
 
-class DropZoneList(QListWidget):
-    """A list widget designed for drag-drop operations with Delete key support."""
+class ChipItemDelegate(QStyledItemDelegate):
+    """Render QListWidget items as compact pill-shaped chips with a close-X glyph.
 
-    def __init__(self, max_height: int = 70, parent: QWidget | None = None) -> None:
+    Sized per-text so chips flow horizontally inside a wrapping list. Hit-rects
+    for the close glyph are cached on the delegate (not the model) so paint is
+    side-effect free.
+    """
+
+    PADDING_X = 8
+    PADDING_Y = 3
+    CLOSE_SIZE = 12
+    CLOSE_GAP = 4
+    BORDER_RADIUS = 10
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._close_rects: dict[int, QRect] = {}
+
+    def close_rect_for(self, row: int) -> QRect | None:
+        """Return the cached hit-rect for a chip's close-X, if it has been painted."""
+        return self._close_rects.get(row)
+
+    def sizeHint(self, option, index) -> QSize:  # noqa: D401 - Qt naming
+        text = index.data(Qt.DisplayRole) or ""
+        fm = option.fontMetrics
+        text_w = fm.horizontalAdvance(str(text))
+        w = self.PADDING_X * 2 + text_w + self.CLOSE_GAP + self.CLOSE_SIZE
+        h = max(fm.height() + self.PADDING_Y * 2, self.CLOSE_SIZE + self.PADDING_Y * 2)
+        return QSize(w, h)
+
+    def paint(self, painter: QPainter, option, index) -> None:  # noqa: D401 - Qt naming
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        body = option.rect.adjusted(1, 1, -1, -1)
+
+        palette: QPalette = option.palette
+        is_selected = bool(option.state & QStyle.State_Selected)
+        bg = palette.color(QPalette.Highlight) if is_selected else palette.color(QPalette.AlternateBase)
+        text_color = palette.color(QPalette.HighlightedText) if is_selected else palette.color(QPalette.Text)
+        border = palette.color(QPalette.Highlight) if is_selected else palette.color(QPalette.Mid)
+
+        painter.setPen(QPen(border, 1))
+        painter.setBrush(bg)
+        painter.drawRoundedRect(body, self.BORDER_RADIUS, self.BORDER_RADIUS)
+
+        text = str(index.data(Qt.DisplayRole) or "")
+        fm = option.fontMetrics
+        text_x = body.left() + self.PADDING_X
+        text_baseline = body.center().y() + (fm.ascent() - fm.descent()) // 2
+        painter.setPen(text_color)
+        painter.drawText(QPoint(text_x, text_baseline), text)
+
+        close_x = body.right() - self.PADDING_X - self.CLOSE_SIZE + 1
+        close_y = body.center().y() - self.CLOSE_SIZE // 2
+        close_rect = QRect(close_x, close_y, self.CLOSE_SIZE, self.CLOSE_SIZE)
+        self._close_rects[index.row()] = close_rect
+
+        cross_pen = QPen(text_color, 1.4)
+        cross_pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(cross_pen)
+        m = 3
+        painter.drawLine(close_rect.left() + m, close_rect.top() + m,
+                         close_rect.right() - m, close_rect.bottom() - m)
+        painter.drawLine(close_rect.right() - m, close_rect.top() + m,
+                         close_rect.left() + m, close_rect.bottom() - m)
+        painter.restore()
+
+
+class DropZoneList(QListWidget):
+    """A list widget designed for drag-drop operations with Delete key support.
+
+    When chip_mode=True items render as horizontal flowing chips via
+    `ChipItemDelegate`; clicks on a chip's close-X remove that item.
+    """
+
+    def __init__(
+        self,
+        max_height: int = 70,
+        chip_mode: bool = False,
+        parent: QWidget | None = None,
+    ) -> None:
         """Initialize the drop zone list with drag-drop support.
-        
+
         Args:
             max_height: Maximum height of the widget in pixels (default: 70).
+            chip_mode: When True, items render as compact horizontal chips.
             parent: Parent widget (default: None).
         """
         super().__init__(parent)
@@ -192,10 +273,21 @@ class DropZoneList(QListWidget):
         self.setDragDropMode(QAbstractItemView.DragDrop)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setObjectName("dropZoneList")
+        self._chip_mode = chip_mode
+        self._chip_delegate: ChipItemDelegate | None = None
+
+        if chip_mode:
+            self.setFlow(QListView.LeftToRight)
+            self.setWrapping(True)
+            self.setResizeMode(QListView.Adjust)
+            self.setSpacing(4)
+            self._chip_delegate = ChipItemDelegate(self)
+            self.setItemDelegate(self._chip_delegate)
+            self.setProperty("chipMode", "true")
 
     def keyPressEvent(self, event: QEvent) -> None:
         """Handle Delete/Backspace to remove selected items.
-        
+
         Args:
             event: The key press event.
         """
@@ -204,6 +296,18 @@ class DropZoneList(QListWidget):
                 self.takeItem(self.row(item))
         else:
             super().keyPressEvent(event)
+
+    def mouseReleaseEvent(self, event: QEvent) -> None:
+        """In chip mode, route clicks on a chip's close-X to remove that item."""
+        if self._chip_mode and self._chip_delegate is not None and event.button() == Qt.LeftButton:
+            index = self.indexAt(event.pos())
+            if index.isValid():
+                hit = self._chip_delegate.close_rect_for(index.row())
+                if hit is not None and hit.contains(event.pos()):
+                    self.takeItem(index.row())
+                    event.accept()
+                    return
+        super().mouseReleaseEvent(event)
 
 
 class QueryEmptyState(QFrame):
