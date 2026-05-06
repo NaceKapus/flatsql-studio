@@ -95,6 +95,9 @@
             "background-color": "rgba(255, 255, 255, 220)",
             "border-color": "#9BA8B6"
         },
+        "QListWidget#dropZoneList": {
+            "border-color": "#9BA8B6"
+        },
         "QTabBar::tab:selected": {
             "border-top": "2px solid #007ACC"
         },
