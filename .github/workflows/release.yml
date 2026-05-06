@@ -32,7 +32,11 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pyinstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pyinstaller>=6.10" "pyinstaller-hooks-contrib>=2025.6"
+          pip install -r requirements.txt
+          pip list
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
@@ -40,6 +44,7 @@ jobs:
         run: |
           pyinstaller \
             --noconfirm \
+            --clean \
             --windowed \
             --name "FlatSQL-Studio" \
             --icon "src/flatsql/assets/img/icon.ico" \
@@ -48,14 +53,31 @@ jobs:
             --collect-all sqlfluff \
             --collect-all pyarrow \
             --collect-all numpy \
+            --copy-metadata numpy \
+            --copy-metadata pyarrow \
             --collect-submodules duckdb \
             run.py
+
+      - name: Verify numpy is fully bundled (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "=== dist/FlatSQL-Studio/_internal/numpy/_core (must contain _multiarray_umath.*.pyd) ==="
+          ls dist/FlatSQL-Studio/_internal/numpy/_core/ 2>/dev/null | head -40 || echo "MISSING numpy/_core directory"
+          echo ""
+          echo "=== PyInstaller warnings (top 80 lines) ==="
+          if [ -f "build/FlatSQL-Studio/warn-FlatSQL-Studio.txt" ]; then
+            head -80 "build/FlatSQL-Studio/warn-FlatSQL-Studio.txt"
+          else
+            echo "no warn file"
+          fi
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: |
           pyinstaller \
             --noconfirm \
+            --clean \
             --windowed \
             --name "FlatSQL Studio" \
             --add-data "src/flatsql/assets:assets" \
@@ -63,6 +85,8 @@ jobs:
             --collect-all sqlfluff \
             --collect-all pyarrow \
             --collect-all numpy \
+            --copy-metadata numpy \
+            --copy-metadata pyarrow \
             --collect-submodules duckdb \
             run.py
 
