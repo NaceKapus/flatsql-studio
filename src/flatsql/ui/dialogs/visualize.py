@@ -1,16 +1,15 @@
-"""Data visualization dialog for interactive charting."""
+"""Data visualization dialog for interactive charting (QtCharts + DuckDB-backed aggregation)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-import matplotlib
 import polars as pl
 import qtawesome as qta
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
+from PySide6.QtCharts import QChart, QChartView
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QPainter, QPalette
+from PySide6.QtGui import QPainter, QPalette, QPdfWriter
+from PySide6.QtSvg import QSvgGenerator
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -23,20 +22,53 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from flatsql.ui.dialogs._visualize_charts import (
+    HeatmapView,
+    PivotTableView,
+    build_area,
+    build_bar,
+    build_line,
+    build_pie,
+    build_scatter,
+    style_chart,
+)
+from flatsql.ui.dialogs._visualize_query import (
+    AggregationController,
+    AggregationRequest,
+    FilterSpec,
+)
 from flatsql.ui.widgets import DownwardComboBox, DropZoneList, MultiselectComboBox
 
-matplotlib.use("QtAgg")
+
+# Maps chart-type code → (button label, qta icon name).
+_CHART_TYPES: list[tuple[str, str, str]] = [
+    ("bar", "Bar", "fa5s.chart-bar"),
+    ("stacked_bar", "Stacked Bar", "mdi.chart-bar-stacked"),
+    ("line", "Line", "fa5s.chart-line"),
+    ("area", "Area", "mdi.chart-areaspline"),
+    ("stacked_area", "Stacked Area", "mdi.chart-multiline"),
+    ("scatter", "Scatter", "mdi.scatter-plot"),
+    ("pie", "Pie", "fa5s.chart-pie"),
+    ("donut", "Donut", "mdi.chart-donut"),
+    ("heatmap", "Heatmap", "mdi.grid"),
+    ("table", "Pivot Table", "fa5s.table"),
+]
 
 
 class _VisualizeDropZone(DropZoneList):
-    """DropZoneList with empty-state placeholder text and drag-hover accent border."""
+    """DropZoneList with empty-state placeholder text and drag-hover accent border.
 
-    def __init__(self, placeholder: str, max_height: int = 70, parent: QWidget | None = None) -> None:
-        super().__init__(max_height=max_height, parent=parent)
+    Always rendered in chip mode so dropped fields appear as compact horizontal chips
+    that wrap when the well grows past one row.
+    """
+
+    def __init__(self, placeholder: str, max_height: int = 36, parent: QWidget | None = None) -> None:
+        super().__init__(max_height=max_height, chip_mode=True, parent=parent)
         self._placeholder = placeholder
 
     def paintEvent(self, event: Any) -> None:
@@ -84,35 +116,52 @@ class VisualizeDialog(QDialog):
         self.setWindowTitle("Visualize Data")
         self.resize(1200, 720)
 
+        self._chart_type = "bar"
+
+        self._bg_color = self.palette().color(QPalette.Window).name()
+        self._text_color = self.palette().color(QPalette.WindowText).name()
+        self._accent_color = self.palette().color(QPalette.Highlight).name()
+        self._grid_color = self.palette().color(QPalette.Mid).name()
+
+        self.agg_controller = AggregationController(df, self)
+        self.agg_controller.result_ready.connect(self._on_aggregation_result)
+        self.agg_controller.failed.connect(self._on_aggregation_failed)
+
+        self._build_ui()
+        self._populate_field_lists()
+        self._update_dropzone_visibility()
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+
+    def _build_ui(self) -> None:
         main_layout = QHBoxLayout(self)
         main_layout.setSpacing(10)
         main_layout.setContentsMargins(12, 12, 12, 12)
 
-        # --- Left panel: Fields ---
+        field_panel = self._build_field_panel()
+        field_panel.setFixedWidth(170)
+        main_layout.addWidget(field_panel)
+
+        settings_panel = self._build_settings_panel()
+        settings_panel.setFixedWidth(240)
+        main_layout.addWidget(settings_panel)
+
+        main_layout.addLayout(self._build_right_pane(), stretch=1)
+
+    def _build_field_panel(self) -> QFrame:
         field_panel = QFrame()
         field_panel.setObjectName("fieldPanel")
         col_layout = QVBoxLayout(field_panel)
         col_layout.setSpacing(6)
-        col_layout.setContentsMargins(10, 12, 10, 12)
+        col_layout.setContentsMargins(8, 8, 8, 8)
 
         attr_header = QLabel("ATTRIBUTES")
         attr_header.setObjectName("sectionHeader")
         col_layout.addWidget(attr_header)
 
-        self.attributes_list = QListWidget()
-        self.attributes_list.setObjectName("dragSourceList")
-        self.attributes_list.setMinimumWidth(200)
-        self.attributes_list.setMinimumHeight(160)
-        self.attributes_list.setSpacing(2)
-        self.attributes_list.setUniformItemSizes(True)
-        self.attributes_list.setDragEnabled(True)
-        self.attributes_list.setAcceptDrops(False)
-        self.attributes_list.setDefaultDropAction(Qt.CopyAction)
-        self.attributes_list.viewport().setCursor(Qt.OpenHandCursor)
-        self.attributes_list.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.attributes_list.customContextMenuRequested.connect(
-            lambda pos: self._show_avail_context_menu(pos, self.attributes_list)
-        )
+        self.attributes_list = self._make_field_list()
         col_layout.addWidget(self.attributes_list, stretch=1)
 
         col_layout.addSpacing(8)
@@ -121,23 +170,30 @@ class VisualizeDialog(QDialog):
         meas_header.setObjectName("sectionHeader")
         col_layout.addWidget(meas_header)
 
-        self.measures_avail_list = QListWidget()
-        self.measures_avail_list.setObjectName("dragSourceList")
-        self.measures_avail_list.setMinimumWidth(200)
-        self.measures_avail_list.setMinimumHeight(160)
-        self.measures_avail_list.setSpacing(2)
-        self.measures_avail_list.setUniformItemSizes(True)
-        self.measures_avail_list.setDragEnabled(True)
-        self.measures_avail_list.setAcceptDrops(False)
-        self.measures_avail_list.setDefaultDropAction(Qt.CopyAction)
-        self.measures_avail_list.viewport().setCursor(Qt.OpenHandCursor)
-        self.measures_avail_list.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.measures_avail_list.customContextMenuRequested.connect(
-            lambda pos: self._show_avail_context_menu(pos, self.measures_avail_list)
-        )
+        self.measures_avail_list = self._make_field_list()
         col_layout.addWidget(self.measures_avail_list, stretch=1)
 
-        for col, dtype in zip(df.columns, df.dtypes):
+        return field_panel
+
+    def _make_field_list(self) -> QListWidget:
+        list_widget = QListWidget()
+        list_widget.setObjectName("dragSourceList")
+        list_widget.setMinimumWidth(150)
+        list_widget.setMinimumHeight(120)
+        list_widget.setSpacing(2)
+        list_widget.setUniformItemSizes(True)
+        list_widget.setDragEnabled(True)
+        list_widget.setAcceptDrops(False)
+        list_widget.setDefaultDropAction(Qt.CopyAction)
+        list_widget.viewport().setCursor(Qt.OpenHandCursor)
+        list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        list_widget.customContextMenuRequested.connect(
+            lambda pos, lw=list_widget: self._show_avail_context_menu(pos, lw)
+        )
+        return list_widget
+
+    def _populate_field_lists(self) -> None:
+        for col, dtype in zip(self.df.columns, self.df.dtypes):
             item = QListWidgetItem(col)
             item.setToolTip(f"{col} ({dtype})")
             row_height = self.attributes_list.fontMetrics().height() + 10
@@ -147,50 +203,17 @@ class VisualizeDialog(QDialog):
             else:
                 self.attributes_list.addItem(item)
 
-        main_layout.addWidget(field_panel, stretch=2)
-
-        # --- Settings panel ---
+    def _build_settings_panel(self) -> QFrame:
         settings_panel = QFrame()
         settings_panel.setObjectName("settingsPanel")
-        settings_layout = QVBoxLayout(settings_panel)
-        settings_layout.setSpacing(8)
-        settings_layout.setContentsMargins(10, 12, 10, 12)
+        layout = QVBoxLayout(settings_panel)
+        layout.setSpacing(6)
+        layout.setContentsMargins(8, 8, 8, 8)
 
-        chart_header = QLabel("CHART TYPE")
-        chart_header.setObjectName("sectionHeader")
-        settings_layout.addWidget(chart_header)
-
-        chart_type_layout = QHBoxLayout()
-        chart_type_layout.setSpacing(0)
-
-        self.chart_type_group = QButtonGroup(self)
-        self.chart_type_group.setExclusive(True)
-
-        self.btn_bar = QPushButton(qta.icon("fa5s.chart-bar"), "Bar")
-        self.btn_bar.setCheckable(True)
-        self.btn_bar.setChecked(True)
-        self.btn_bar.setObjectName("chartTypeBtnLeft")
-
-        self.btn_line = QPushButton(qta.icon("fa5s.chart-line"), "Line")
-        self.btn_line.setCheckable(True)
-        self.btn_line.setObjectName("chartTypeBtnMid")
-
-        self.btn_scatter = QPushButton(qta.icon("mdi.scatter-plot"), "Scatter")
-        self.btn_scatter.setCheckable(True)
-        self.btn_scatter.setObjectName("chartTypeBtnRight")
-
-        for btn in (self.btn_bar, self.btn_line, self.btn_scatter):
-            self.chart_type_group.addButton(btn)
-            chart_type_layout.addWidget(btn)
-
-        self.chart_type_group.buttonClicked.connect(self._draw_chart)
-        settings_layout.addLayout(chart_type_layout)
-        settings_layout.addSpacing(12)
-
-        x_header = QLabel("X-AXIS")
-        x_header.setObjectName("sectionHeader")
-        settings_layout.addWidget(x_header)
-        self.x_list = _VisualizeDropZone("Drop a field here", max_height=50)
+        self.x_header = QLabel("X-AXIS")
+        self.x_header.setObjectName("sectionHeader")
+        layout.addWidget(self.x_header)
+        self.x_list = _VisualizeDropZone("Drop a field here", max_height=36)
         self.x_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.x_list.customContextMenuRequested.connect(
             lambda pos: self._show_dropzone_context_menu(pos, self.x_list, "X")
@@ -198,15 +221,31 @@ class VisualizeDialog(QDialog):
         self.x_list.model().rowsInserted.connect(
             lambda: QTimer.singleShot(0, self._on_x_items_inserted)
         )
-        self.x_list.model().rowsRemoved.connect(lambda: QTimer.singleShot(0, self._draw_chart))
-        settings_layout.addWidget(self.x_list)
+        self.x_list.model().rowsRemoved.connect(
+            lambda: QTimer.singleShot(0, self._request_aggregation)
+        )
+        layout.addWidget(self.x_list)
 
-        settings_layout.addSpacing(8)
+        self.rows_header = QLabel("ROWS")
+        self.rows_header.setObjectName("sectionHeader")
+        layout.addWidget(self.rows_header)
+        self.rows_list = _VisualizeDropZone("Drop a field here", max_height=36)
+        self.rows_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.rows_list.customContextMenuRequested.connect(
+            lambda pos: self._show_dropzone_context_menu(pos, self.rows_list, "Rows")
+        )
+        self.rows_list.model().rowsInserted.connect(
+            lambda: QTimer.singleShot(0, self._on_rows_items_inserted)
+        )
+        self.rows_list.model().rowsRemoved.connect(
+            lambda: QTimer.singleShot(0, self._request_aggregation)
+        )
+        layout.addWidget(self.rows_list)
 
-        y_header = QLabel("Y-AXIS")
-        y_header.setObjectName("sectionHeader")
-        settings_layout.addWidget(y_header)
-        self.y_list = _VisualizeDropZone("Drop measures here", max_height=100)
+        self.y_header = QLabel("Y-AXIS")
+        self.y_header.setObjectName("sectionHeader")
+        layout.addWidget(self.y_header)
+        self.y_list = _VisualizeDropZone("Drop measures here", max_height=80)
         self.y_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.y_list.customContextMenuRequested.connect(
             lambda pos: self._show_dropzone_context_menu(pos, self.y_list, "Y")
@@ -214,15 +253,15 @@ class VisualizeDialog(QDialog):
         self.y_list.model().rowsInserted.connect(
             lambda: QTimer.singleShot(0, self._on_y_items_inserted)
         )
-        self.y_list.model().rowsRemoved.connect(lambda: QTimer.singleShot(0, self._draw_chart))
-        settings_layout.addWidget(self.y_list)
-
-        settings_layout.addSpacing(8)
+        self.y_list.model().rowsRemoved.connect(
+            lambda: QTimer.singleShot(0, self._request_aggregation)
+        )
+        layout.addWidget(self.y_list)
 
         filter_header = QLabel("FILTERS")
         filter_header.setObjectName("sectionHeader")
-        settings_layout.addWidget(filter_header)
-        self.filters_list = _VisualizeDropZone("Drop fields to filter", max_height=100)
+        layout.addWidget(filter_header)
+        self.filters_list = _VisualizeDropZone("Drop fields to filter", max_height=80)
         self.filters_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.filters_list.customContextMenuRequested.connect(
             lambda pos: self._show_dropzone_context_menu(pos, self.filters_list, "Filter")
@@ -230,52 +269,118 @@ class VisualizeDialog(QDialog):
         self.filters_list.model().rowsInserted.connect(
             lambda: QTimer.singleShot(0, self._on_filter_items_inserted)
         )
-        self.filters_list.model().rowsRemoved.connect(lambda: QTimer.singleShot(0, self._sync_filters))
-        settings_layout.addWidget(self.filters_list)
+        self.filters_list.model().rowsRemoved.connect(
+            lambda: QTimer.singleShot(0, self._sync_filters)
+        )
+        layout.addWidget(self.filters_list)
 
-        settings_layout.addStretch()
-        main_layout.addWidget(settings_panel, stretch=2)
+        layout.addStretch()
+        return settings_panel
 
-        # --- Right pane: slicer bar + chart ---
+    def _build_chart_type_bar(self) -> QHBoxLayout:
+        chart_type_layout = QHBoxLayout()
+        chart_type_layout.setSpacing(0)
+
+        self.chart_type_group = QButtonGroup(self)
+        self.chart_type_group.setExclusive(True)
+        self._chart_type_buttons: dict[str, QPushButton] = {}
+
+        for i, (code, label, icon_name) in enumerate(_CHART_TYPES):
+            btn = QPushButton()
+            try:
+                btn.setIcon(qta.icon(icon_name, color=self._text_color))
+            except Exception:
+                # Fallback: best-effort fontawesome icon if mdi name is missing
+                btn.setIcon(qta.icon("fa5s.chart-bar", color=self._text_color))
+            btn.setIconSize(QSize(16, 16))
+            btn.setCheckable(True)
+            btn.setToolTip(label)
+            btn.setProperty("chartTypeCode", code)
+            if i == 0:
+                btn.setObjectName("chartTypeBtnLeft")
+                btn.setChecked(True)
+            elif i == len(_CHART_TYPES) - 1:
+                btn.setObjectName("chartTypeBtnRight")
+            else:
+                btn.setObjectName("chartTypeBtnMid")
+            self.chart_type_group.addButton(btn)
+            chart_type_layout.addWidget(btn)
+            self._chart_type_buttons[code] = btn
+
+        self.chart_type_group.buttonClicked.connect(self._on_chart_type_changed)
+        return chart_type_layout
+
+    def _build_right_pane(self) -> QVBoxLayout:
         right_pane_layout = QVBoxLayout()
         right_pane_layout.setSpacing(6)
 
+        right_pane_layout.addWidget(self._build_chart_toolbar())
+
         self.slicer_container = QWidget()
         self.slicer_layout = QHBoxLayout(self.slicer_container)
-        self.slicer_layout.setContentsMargins(0, 0, 0, 10)
+        self.slicer_layout.setContentsMargins(0, 0, 0, 6)
         self.slicer_layout.setSpacing(8)
         self.slicer_layout.setAlignment(Qt.AlignLeft)
-        self.slicer_label = QLabel("No active filters")
-        self.slicer_label.setObjectName("slicerInfoLabel")
-        self.slicer_layout.addWidget(self.slicer_label)
+        self.slicer_container.setVisible(False)
         right_pane_layout.addWidget(self.slicer_container)
 
-        self.figure = Figure(figsize=(6, 4), dpi=100)
-        self.canvas = FigureCanvasQTAgg(self.figure)
-        self.ax = self.figure.add_subplot(111)
+        self.chart_view = QChartView()
+        self.chart_view.setRenderHint(QPainter.Antialiasing, True)
+        self.chart = QChart()
+        self.chart.legend().setVisible(True)
+        self.chart_view.setChart(self.chart)
+        style_chart(self.chart, bg_color=self._bg_color, text_color=self._text_color)
 
-        self.bg_color = self.palette().color(QPalette.Window).name()
-        self.plot_text_color = self.palette().color(QPalette.WindowText).name()
+        self.heatmap_view = HeatmapView()
+        self.heatmap_view.set_theme(
+            bg_color=self._bg_color,
+            text_color=self._text_color,
+            accent_color=self._accent_color,
+        )
 
-        self.figure.patch.set_facecolor(self.bg_color)
-        self._apply_chart_theme()
-        self.ax.axis("off")
+        self.pivot_view = PivotTableView()
+        self.pivot_view.set_theme(
+            bg_color=self._bg_color,
+            text_color=self._text_color,
+            accent_color=self._accent_color,
+        )
 
-        right_pane_layout.addWidget(self.canvas, stretch=1)
+        self.chart_stack = QStackedWidget()
+        self.chart_stack.addWidget(self.chart_view)      # index 0
+        self.chart_stack.addWidget(self.heatmap_view)    # index 1
+        self.chart_stack.addWidget(self.pivot_view)      # index 2
+        right_pane_layout.addWidget(self.chart_stack, stretch=1)
 
-        chart_btn_layout = QHBoxLayout()
-        chart_btn_layout.addStretch()
+        self.status_label = QLabel("")
+        self.status_label.setObjectName("slicerInfoLabel")
+        self.status_label.setVisible(False)
+        right_pane_layout.addWidget(self.status_label)
+
+        return right_pane_layout
+
+    def _build_chart_toolbar(self) -> QFrame:
+        toolbar = QFrame()
+        toolbar.setObjectName("chartToolbar")
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(0, 0, 0, 6)
+        toolbar_layout.setSpacing(8)
+
+        toolbar_layout.addLayout(self._build_chart_type_bar())
+        toolbar_layout.addStretch()
 
         self.reset_btn = QPushButton("Reset Visual")
         self.reset_btn.clicked.connect(self._reset_visual)
-        chart_btn_layout.addWidget(self.reset_btn)
+        toolbar_layout.addWidget(self.reset_btn)
 
         self.export_btn = QPushButton("Export Visual")
         self.export_btn.clicked.connect(self._export_chart)
-        chart_btn_layout.addWidget(self.export_btn)
+        toolbar_layout.addWidget(self.export_btn)
 
-        right_pane_layout.addLayout(chart_btn_layout)
-        main_layout.addLayout(right_pane_layout, stretch=4)
+        return toolbar
+
+    # ------------------------------------------------------------------
+    # Item-text helpers (preserved from previous implementation)
+    # ------------------------------------------------------------------
 
     def _clean_item_text(self, text: str) -> str:
         """Remove aggregation or filter-type suffixes from an item label."""
@@ -294,7 +399,18 @@ class VisualizeDialog(QDialog):
             item = self.x_list.item(0)
             item.setText(self._clean_item_text(item.text()))
 
-        self._draw_chart()
+        self._request_aggregation()
+
+    def _on_rows_items_inserted(self) -> None:
+        """Keep at most one ROWS item (heatmap second dimension) and normalize text."""
+        while self.rows_list.count() > 1:
+            self.rows_list.takeItem(0)
+
+        if self.rows_list.count() == 1:
+            item = self.rows_list.item(0)
+            item.setText(self._clean_item_text(item.text()))
+
+        self._request_aggregation()
 
     def _on_y_items_inserted(self) -> None:
         """Ensure Y-axis items default to SUM aggregation when no suffix exists."""
@@ -311,7 +427,7 @@ class VisualizeDialog(QDialog):
             if not has_agg:
                 item.setText(f"{self._clean_item_text(text)} (SUM)")
 
-        self._draw_chart()
+        self._request_aggregation()
 
     def _on_filter_items_inserted(self) -> None:
         """Ensure filter items default to Drop Down filter type."""
@@ -330,13 +446,21 @@ class VisualizeDialog(QDialog):
 
         self._sync_filters()
 
+    # ------------------------------------------------------------------
+    # Slicer (filter) widgets
+    # ------------------------------------------------------------------
+
     def _sync_filters(self) -> None:
         """Synchronize slicer widgets with filter drop-zone items."""
         current_filters: dict[str, str] = {}
         for i in range(self.filters_list.count()):
             text = self.filters_list.item(i).text()
             col = self._clean_item_text(text)
-            f_type = text.rsplit(" (", 1)[1].rstrip(")") if text.endswith(")") and " (" in text else "Drop Down"
+            f_type = (
+                text.rsplit(" (", 1)[1].rstrip(")")
+                if text.endswith(")") and " (" in text
+                else "Drop Down"
+            )
             current_filters[col] = f_type
 
         for col in list(self.active_filters.keys()):
@@ -359,21 +483,22 @@ class VisualizeDialog(QDialog):
                 widget.addItem("(All)")
                 for val in unique_vals:
                     widget.addItem(str(val))
-                widget.currentIndexChanged.connect(self._draw_chart)
+                widget.currentIndexChanged.connect(self._request_aggregation)
             else:
                 widget = MultiselectComboBox(title=col)
                 widget.add_items(unique_vals)
-                widget.selectionChanged.connect(self._draw_chart)
+                widget.selectionChanged.connect(self._request_aggregation)
 
             self.slicer_layout.addWidget(widget)
             self.active_filters[col] = (f_type, widget)
 
-        if self.active_filters:
-            self.slicer_label.hide()
-        else:
-            self.slicer_label.show()
+        self.slicer_container.setVisible(bool(self.active_filters))
 
-        self._draw_chart()
+        self._request_aggregation()
+
+    # ------------------------------------------------------------------
+    # Context menus
+    # ------------------------------------------------------------------
 
     def _show_avail_context_menu(self, pos: Any, list_widget: QListWidget) -> None:
         """Show context menu for available attribute/measure items."""
@@ -383,19 +508,22 @@ class VisualizeDialog(QDialog):
 
         menu = QMenu(self)
         add_x_action = menu.addAction("Add to X-Axis")
+        add_rows_action = menu.addAction("Add to Rows (Heatmap)")
         add_y_action = menu.addAction("Add to Y-Axis")
         add_filter_action = menu.addAction("Add to Filters")
 
         action = menu.exec(list_widget.viewport().mapToGlobal(pos))
         if action == add_x_action:
             self.x_list.addItem(item.text())
+        elif action == add_rows_action:
+            self.rows_list.addItem(item.text())
         elif action == add_y_action:
             self.y_list.addItem(item.text())
         elif action == add_filter_action:
             self.filters_list.addItem(item.text())
 
     def _show_dropzone_context_menu(self, pos: Any, list_widget: QListWidget, list_type: str) -> None:
-        """Show context menu for X/Y/filter drop-zone items."""
+        """Show context menu for X/Rows/Y/filter drop-zone items."""
         item = list_widget.itemAt(pos)
         if not item:
             return
@@ -405,6 +533,8 @@ class VisualizeDialog(QDialog):
         targets: list[tuple[str, QListWidget]] = []
         if list_type != "X":
             targets.append(("X-Axis", self.x_list))
+        if list_type != "Rows":
+            targets.append(("Rows", self.rows_list))
         if list_type != "Y":
             targets.append(("Y-Axis", self.y_list))
         if list_type != "Filter":
@@ -458,67 +588,73 @@ class VisualizeDialog(QDialog):
         elif action in agg_actions:
             new_agg = agg_actions[action]
             item.setText(f"{self._clean_item_text(item.text())} ({new_agg})")
-            self._draw_chart()
+            self._request_aggregation()
         elif action in type_actions:
             new_type = type_actions[action]
             item.setText(f"{self._clean_item_text(item.text())} ({new_type})")
             self._sync_filters()
 
-    def _apply_chart_theme(self) -> None:
-        """Apply palette-aligned styling to the matplotlib axes."""
-        self.ax.set_facecolor(self.bg_color)
-        self.ax.tick_params(colors=self.plot_text_color)
-        self.ax.xaxis.label.set_color(self.plot_text_color)
-        self.ax.yaxis.label.set_color(self.plot_text_color)
-        self.ax.spines["bottom"].set_color(self.plot_text_color)
-        self.ax.spines["left"].set_color(self.plot_text_color)
-        self.ax.spines["top"].set_visible(False)
-        self.ax.spines["right"].set_visible(False)
-        self.ax.yaxis.grid(True, linestyle="--", alpha=0.25, color=self.plot_text_color)
-        self.ax.set_axisbelow(True)
+    # ------------------------------------------------------------------
+    # Chart-type and dropzone visibility
+    # ------------------------------------------------------------------
 
-    def _reset_visual(self) -> None:
-        """Reset all configured axes and filters and clear the chart canvas."""
-        self.x_list.clear()
-        self.y_list.clear()
-        self.filters_list.clear()
-        self.ax.clear()
-        self.ax.axis("off")
-        self.canvas.draw()
-
-    def _export_chart(self) -> None:
-        """Export the current chart to an image or vector file."""
-        if self.x_list.count() == 0 or self.y_list.count() == 0:
-            QMessageBox.information(self, "Export", "Please plot a chart first before exporting.")
+    def _on_chart_type_changed(self) -> None:
+        btn = self.chart_type_group.checkedButton()
+        if btn is None:
             return
+        self._chart_type = btn.property("chartTypeCode") or "bar"
 
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Export Visual",
-            "",
-            "PNG Image (*.png);;PDF Document (*.pdf);;SVG Vector (*.svg)",
-        )
-        if path:
-            try:
-                self.figure.savefig(path, bbox_inches="tight", facecolor=self.bg_color)
-                QMessageBox.information(self, "Success", f"Chart successfully exported to:\n{path}")
-            except Exception as exc:
-                QMessageBox.critical(self, "Error", f"Failed to export chart:\n{exc}")
+        if self._chart_type == "heatmap":
+            self.chart_stack.setCurrentWidget(self.heatmap_view)
+        elif self._chart_type == "table":
+            self.chart_stack.setCurrentWidget(self.pivot_view)
+        else:
+            self.chart_stack.setCurrentWidget(self.chart_view)
 
-    def _draw_chart(self) -> None:
-        """Render the chart from selected axes, measures, and active filters."""
-        if self.x_list.count() == 0 or self.y_list.count() == 0:
-            self.ax.clear()
-            self.ax.axis("off")
-            self.canvas.draw()
-            return
+        self._update_dropzone_visibility()
+        self._request_aggregation()
 
-        self.ax.axis("on")
-        checked_button = self.chart_type_group.checkedButton()
-        chart_type = checked_button.text() if checked_button else "Bar"
+    def _update_dropzone_visibility(self) -> None:
+        # ROWS dropzone is required for heatmap and optional for table; hidden otherwise.
+        show_rows = self._chart_type in ("heatmap", "table")
+        self.rows_header.setVisible(show_rows)
+        self.rows_list.setVisible(show_rows)
 
-        x_col = self._clean_item_text(self.x_list.item(0).text())
+        if self._chart_type in ("heatmap", "table"):
+            self.x_header.setText("COLUMNS")
+        else:
+            self.x_header.setText("X-AXIS")
 
+    # ------------------------------------------------------------------
+    # Aggregation pipeline
+    # ------------------------------------------------------------------
+
+    def _build_filter_specs(self) -> list[FilterSpec]:
+        """Translate live slicer state into FilterSpec objects for the worker."""
+        specs: list[FilterSpec] = []
+        for col, (f_type, widget) in self.active_filters.items():
+            dtype = self.df.schema[col]
+            if f_type == "Drop Down":
+                value = widget.currentText()
+                if value == "(All)":
+                    specs.append(FilterSpec(col=col, kind="all"))
+                else:
+                    casted = pl.Series([value]).cast(dtype, strict=False)[0]
+                    specs.append(FilterSpec(col=col, kind="single", values=[casted]))
+            else:
+                checked = widget.get_checked_items()
+                total = widget.model.rowCount() - 1
+                if len(checked) == total:
+                    specs.append(FilterSpec(col=col, kind="all"))
+                elif len(checked) == 0:
+                    specs.append(FilterSpec(col=col, kind="multi_none"))
+                else:
+                    casted_vals = pl.Series(checked).cast(dtype, strict=False).to_list()
+                    specs.append(FilterSpec(col=col, kind="multi_partial", values=casted_vals))
+        return specs
+
+    def _build_y_items(self) -> list[tuple[str, str]]:
+        """Parse Y-list entries into (column, aggregation) pairs, deduplicated."""
         y_items: list[tuple[str, str]] = []
         seen: set[str] = set()
         for i in range(self.y_list.count()):
@@ -528,134 +664,283 @@ class VisualizeDialog(QDialog):
                 agg = agg.rstrip(")")
             else:
                 col, agg = text, "SUM"
-
             alias = f"{col} ({agg})"
             if alias not in seen:
                 y_items.append((col, agg))
                 seen.add(alias)
+        return y_items
 
-        if not y_items:
+    def _request_aggregation(self) -> None:
+        """Build an AggregationRequest from current selections and ask the worker to run it."""
+        if self.x_list.count() == 0 or self.y_list.count() == 0:
+            self._render_empty_state("Drop a field on X-Axis and a measure on Y-Axis")
             return
 
-        y_cols_raw = [item[0] for item in y_items]
+        if self._chart_type == "heatmap" and self.rows_list.count() == 0:
+            self._render_empty_state("Heatmap also needs a field in ROWS")
+            return
 
-        self.ax.clear()
-        self._apply_chart_theme()
+        x_col = self._clean_item_text(self.x_list.item(0).text())
+        rows_col = (
+            self._clean_item_text(self.rows_list.item(0).text())
+            if self._chart_type in ("heatmap", "table") and self.rows_list.count() > 0
+            else None
+        )
 
-        try:
-            valid_df = self.df
-
-            for filter_col, (filter_type, widget) in self.active_filters.items():
-                dtype = self.df.schema[filter_col]
-                if filter_type == "Drop Down":
-                    value = widget.currentText()
-                    if value != "(All)":
-                        cast_value = pl.Series([value]).cast(dtype, strict=False)[0]
-                        valid_df = valid_df.filter(pl.col(filter_col) == cast_value)
-                else:
-                    vals = widget.get_checked_items()
-                    total_items = widget.model.rowCount() - 1
-                    if len(vals) < total_items:
-                        if len(vals) == 0:
-                            valid_df = valid_df.filter(pl.lit(False))
-                        else:
-                            cast_vals = pl.Series(vals).cast(dtype, strict=False)
-                            valid_df = valid_df.filter(pl.col(filter_col).is_in(cast_vals))
-
-            valid_df = valid_df.drop_nulls(subset=[x_col] + y_cols_raw)
-            if valid_df.is_empty():
-                self.ax.text(
-                    0.5,
-                    0.5,
-                    "No valid data to plot",
-                    color=self.plot_text_color,
-                    ha="center",
-                    va="center",
-                )
-                self.ax.axis("off")
-                self.canvas.draw()
-                return
-
-            agg_funcs = {
-                "SUM": "sum",
-                "AVG": "mean",
-                "MIN": "min",
-                "MAX": "max",
-                "COUNT": "count",
-            }
-
-            agg_exprs = []
-            for col, agg in y_items:
-                func_name = agg_funcs.get(agg, "sum")
-                agg_exprs.append(getattr(pl.col(col), func_name)().alias(f"{col} ({agg})"))
-
-            plot_df = valid_df.group_by(x_col).agg(agg_exprs).sort(x_col)
-            x_data = plot_df[x_col].to_list()
-
-            accent_hex = self.palette().color(QPalette.Highlight).name()
-            default_colors = [
-                accent_hex,
-                "#E65100",
-                "#28A745",
-                "#6F42C1",
-                "#D32F2F",
-                "#17A2B8",
-                "#FFC107",
-            ]
-            colors = [accent_hex] + [c for c in default_colors if c.upper() != accent_hex.upper()]
-
-            x_indices = list(range(len(x_data)))
-            num_bars = len(y_items)
-            bar_width = 0.8 / num_bars
-
-            for i, (col, agg) in enumerate(y_items):
-                display_name = f"{col} ({agg})"
-                y_data = plot_df[display_name].to_list()
-                color = colors[i % len(colors)]
-
-                if chart_type == "Bar":
-                    offsets = [x - 0.4 + (i + 0.5) * bar_width for x in x_indices]
-                    self.ax.bar(
-                        offsets, y_data, width=bar_width, label=display_name,
-                        color=color, edgecolor="none",
-                    )
-                elif chart_type == "Line":
-                    self.ax.plot(x_data, y_data, marker="o", linewidth=2, label=display_name, color=color)
-                elif chart_type == "Scatter":
-                    self.ax.scatter(x_data, y_data, label=display_name, color=color)
-
-            self.ax.set_xlabel(x_col, color=self.plot_text_color)
-
-            if len(y_items) == 1:
-                col, agg = y_items[0]
-                self.ax.set_ylabel(f"{agg} of {col}", color=self.plot_text_color)
-                self.ax.set_title(f"{col} vs {x_col} ({agg})", color=self.plot_text_color)
-            else:
-                self.ax.set_ylabel("Values", color=self.plot_text_color)
-                self.ax.set_title(f"Multiple Measures vs {x_col}", color=self.plot_text_color)
-
-            if chart_type == "Bar":
-                self.ax.set_xticks(x_indices)
-                self.ax.set_xticklabels(x_data)
-
-            if len(x_data) > 5:
-                self.ax.tick_params(axis="x", rotation=45)
-
-            if len(y_items) > 1:
-                self.ax.legend(
-                    facecolor=self.bg_color,
-                    edgecolor=self.plot_text_color,
-                    labelcolor=self.plot_text_color,
-                )
-
-            self.figure.tight_layout(pad=1.5)
-            self.canvas.draw()
-        except Exception as exc:
-            QMessageBox.critical(
-                self,
-                "Rendering Error",
-                f"Cannot draw chart with current configuration:\n\n{exc}",
+        if rows_col is not None and rows_col == x_col:
+            self._render_empty_state(
+                "COLUMNS and ROWS must be different fields — pick another for ROWS."
             )
-            self.ax.clear()
-            self.ax.axis("off")
-            self.canvas.draw()
+            return
+        y_items = self._build_y_items()
+        if not y_items:
+            self._render_empty_state("Drop a measure on Y-Axis")
+            return
+
+        if self._chart_type in ("pie", "donut") and len(y_items) > 1:
+            self.status_label.setText(
+                "Pie / Donut accept a single measure — showing the first."
+            )
+            self.status_label.setVisible(True)
+            y_items = y_items[:1]
+        elif self._chart_type == "heatmap" and len(y_items) > 1:
+            self.status_label.setText(
+                "Heatmap uses a single measure for color intensity — showing the first."
+            )
+            self.status_label.setVisible(True)
+            y_items = y_items[:1]
+        elif self._chart_type == "table" and rows_col is not None and len(y_items) > 1:
+            self.status_label.setText(
+                "Pivot Table with ROWS uses a single measure — showing the first."
+            )
+            self.status_label.setVisible(True)
+            y_items = y_items[:1]
+        else:
+            self.status_label.setVisible(False)
+            self.status_label.setText("")
+
+        req = AggregationRequest(
+            chart_type=self._chart_type,
+            x_col=x_col,
+            y_items=y_items,
+            rows_col=rows_col,
+            filters=self._build_filter_specs(),
+        )
+        self.agg_controller.request(req)
+
+    def _render_empty_state(self, message: str) -> None:
+        """Show a placeholder message instead of a chart when configuration is incomplete."""
+        if self._chart_type == "heatmap":
+            self.heatmap_view.show_message(message)
+        elif self._chart_type == "table":
+            self.pivot_view.show_message(message)
+        else:
+            self.chart.removeAllSeries()
+            for axis in list(self.chart.axes()):
+                self.chart.removeAxis(axis)
+            self.chart.setTitle(message)
+        self.status_label.setVisible(False)
+
+    def _on_aggregation_result(self, plot_df: pl.DataFrame) -> None:
+        """Receive the aggregated DataFrame and dispatch to the right chart builder."""
+        if plot_df is None or plot_df.is_empty():
+            self._render_empty_state("No data matches the current filters")
+            return
+
+        x_col = self._clean_item_text(self.x_list.item(0).text())
+        y_items = self._build_y_items()
+        chart_type = self._chart_type
+
+        if chart_type == "heatmap":
+            if not y_items or self.rows_list.count() == 0:
+                return
+            rows_col = self._clean_item_text(self.rows_list.item(0).text())
+            value_col = f"{y_items[0][0]} ({y_items[0][1]})"
+            self.heatmap_view.render_data(
+                plot_df,
+                x_col=x_col,
+                rows_col=rows_col,
+                value_col=value_col,
+            )
+            return
+
+        if chart_type == "table":
+            measure_aliases = [f"{c} ({a})" for c, a in y_items]
+            if self.rows_list.count() > 0:
+                rows_col = self._clean_item_text(self.rows_list.item(0).text())
+                value_col = measure_aliases[0]
+                self.pivot_view.render_pivot(
+                    plot_df,
+                    x_col=x_col,
+                    rows_col=rows_col,
+                    value_col=value_col,
+                )
+            else:
+                self.pivot_view.render_flat(plot_df, x_col=x_col, measure_aliases=measure_aliases)
+            return
+
+        # Reset the QChart
+        self.chart.removeAllSeries()
+        for axis in list(self.chart.axes()):
+            self.chart.removeAxis(axis)
+        self.chart.setTitle("")
+
+        palette = self._build_palette(len(y_items))
+
+        if chart_type == "bar":
+            build_bar(
+                self.chart, plot_df, x_col, y_items, palette,
+                stacked=False, grid_color=self._grid_color, text_color=self._text_color,
+            )
+        elif chart_type == "stacked_bar":
+            build_bar(
+                self.chart, plot_df, x_col, y_items, palette,
+                stacked=True, grid_color=self._grid_color, text_color=self._text_color,
+            )
+        elif chart_type == "line":
+            build_line(
+                self.chart, plot_df, x_col, y_items, palette,
+                grid_color=self._grid_color, text_color=self._text_color,
+            )
+        elif chart_type == "area":
+            build_area(
+                self.chart, plot_df, x_col, y_items, palette,
+                stacked=False, grid_color=self._grid_color, text_color=self._text_color,
+            )
+        elif chart_type == "stacked_area":
+            build_area(
+                self.chart, plot_df, x_col, y_items, palette,
+                stacked=True, grid_color=self._grid_color, text_color=self._text_color,
+            )
+        elif chart_type == "scatter":
+            build_scatter(
+                self.chart, plot_df, x_col, y_items, palette,
+                grid_color=self._grid_color, text_color=self._text_color,
+            )
+        elif chart_type == "pie":
+            build_pie(
+                self.chart, plot_df, x_col, y_items[0], palette,
+                donut=False, text_color=self._text_color,
+            )
+        elif chart_type == "donut":
+            build_pie(
+                self.chart, plot_df, x_col, y_items[0], palette,
+                donut=True, text_color=self._text_color,
+            )
+
+        # Title
+        if len(y_items) == 1:
+            col, agg = y_items[0]
+            if chart_type in ("pie", "donut"):
+                self.chart.setTitle(f"{agg} of {col} by {x_col}")
+            else:
+                self.chart.setTitle(f"{col} vs {x_col} ({agg})")
+        else:
+            self.chart.setTitle(f"Multiple Measures vs {x_col}")
+
+        self.chart.legend().setVisible(len(y_items) > 1 or chart_type in ("pie", "donut"))
+
+    def _on_aggregation_failed(self, message: str) -> None:
+        """Surface query failures inside the chart area instead of a modal dialog."""
+        self._render_empty_state(f"Cannot render chart:\n{message}")
+
+    def _build_palette(self, n_measures: int) -> list[str]:
+        """Return a list of color hex strings starting with the theme accent."""
+        accent_hex = self._accent_color
+        bi_palette = [
+            accent_hex,
+            "#E65100",
+            "#28A745",
+            "#6F42C1",
+            "#D32F2F",
+            "#17A2B8",
+            "#FFC107",
+            "#7B1FA2",
+            "#00897B",
+        ]
+        # De-dupe accent if it collides with one of the fixed colors.
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for c in bi_palette:
+            cu = c.upper()
+            if cu in seen:
+                continue
+            seen.add(cu)
+            deduped.append(c)
+        if n_measures <= len(deduped):
+            return deduped
+        return deduped + deduped  # repeat for many-measure cases (rare)
+
+    # ------------------------------------------------------------------
+    # Reset / Export
+    # ------------------------------------------------------------------
+
+    def _reset_visual(self) -> None:
+        """Reset all configured axes and filters and clear the chart canvas."""
+        self.x_list.clear()
+        self.rows_list.clear()
+        self.y_list.clear()
+        self.filters_list.clear()
+        self._render_empty_state("")
+
+    def _export_chart(self) -> None:
+        """Export the current chart to PNG, PDF, or SVG using Qt-native renderers."""
+        if self.x_list.count() == 0 or self.y_list.count() == 0:
+            QMessageBox.information(self, "Export", "Please plot a chart first before exporting.")
+            return
+
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Export Visual",
+            "",
+            "PNG Image (*.png);;PDF Document (*.pdf);;SVG Vector (*.svg)",
+        )
+        if not path:
+            return
+
+        if self._chart_type == "heatmap":
+            target = self.heatmap_view
+        elif self._chart_type == "table":
+            target = self.pivot_view
+        else:
+            target = self.chart_view
+        try:
+            lower = path.lower()
+            if lower.endswith(".png") or "PNG" in selected_filter:
+                pixmap = target.grab()
+                if not pixmap.save(path, "PNG"):
+                    raise RuntimeError("Qt could not save the PNG file.")
+            elif lower.endswith(".pdf") or "PDF" in selected_filter:
+                writer = QPdfWriter(path)
+                writer.setResolution(150)
+                painter = QPainter(writer)
+                target.render(painter)
+                painter.end()
+            elif lower.endswith(".svg") or "SVG" in selected_filter:
+                generator = QSvgGenerator()
+                generator.setFileName(path)
+                size = target.size()
+                generator.setSize(size)
+                generator.setViewBox(target.rect())
+                painter = QPainter(generator)
+                target.render(painter)
+                painter.end()
+            else:
+                pixmap = target.grab()
+                if not pixmap.save(path):
+                    raise RuntimeError("Qt could not save the file.")
+            QMessageBox.information(self, "Success", f"Chart successfully exported to:\n{path}")
+        except Exception as exc:
+            QMessageBox.critical(self, "Error", f"Failed to export chart:\n{exc}")
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def closeEvent(self, event: Any) -> None:
+        """Tear down the aggregation worker thread before the dialog closes."""
+        try:
+            self.agg_controller.shutdown()
+        except Exception:
+            pass
+        super().closeEvent(event)
