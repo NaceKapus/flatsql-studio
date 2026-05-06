@@ -1,26 +1,22 @@
 """DuckDB memory profiler dialog with live monitoring and visualization."""
 from __future__ import annotations
 
-import matplotlib
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-from PySide6.QtCore import QTimer
-from PySide6.QtGui import QPalette
+from PySide6.QtCharts import QAreaSeries, QChart, QChartView, QLineSeries, QValueAxis
+from PySide6.QtCore import QPointF, Qt, QTimer
+from PySide6.QtGui import QBrush, QColor, QPainter, QPalette, QPen
 from PySide6.QtWidgets import QDialog, QTabWidget, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
-
-matplotlib.use("QtAgg")
 
 
 class DuckDBProfilerDialog(QDialog):
     """Dialog for monitoring DuckDB memory usage and performance metrics.
-    
+
     Displays memory allocation by tag in a tree widget and provides a live
     memory usage graph updated every 0.1 seconds. Supports theme-aware colors.
     """
 
     def __init__(self, engine: object, parent: QWidget | None = None) -> None:
         """Initialize the profiler dialog.
-        
+
         Args:
             engine: DuckDB engine instance with a main_con connection.
             parent: Parent widget (optional).
@@ -34,7 +30,6 @@ class DuckDBProfilerDialog(QDialog):
         self.mem_history: list[float] = []
         self.max_history_points = 60
         self.graph_floor_tolerance_mb = 0.01
-        self.text_color = "#ffffff"
 
         main_layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -67,21 +62,77 @@ class DuckDBProfilerDialog(QDialog):
         self.tabs.addTab(tab, "Details")
 
     def _setup_graph_tab(self) -> None:
-        """Create and configure the live memory graph tab."""
+        """Create and configure the live memory graph tab using QtCharts."""
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        self.figure = Figure(figsize=(6, 4), dpi=100)
-        self.canvas = FigureCanvasQTAgg(self.figure)
-        self.ax = self.figure.add_subplot(111)
+        bg_color = QColor(self.palette().color(QPalette.Window))
+        text_color = QColor(self.palette().color(QPalette.WindowText))
+        accent_color = QColor(self.palette().color(QPalette.Highlight))
+        grid_color = QColor(text_color)
+        grid_color.setAlphaF(0.25)
 
-        # Match application theme colors
-        bg_color = self.palette().color(QPalette.Window).name()
-        self.text_color = self.palette().color(QPalette.WindowText).name()
-        self.figure.patch.set_facecolor(bg_color)
-        self.ax.set_facecolor(bg_color)
+        self.chart = QChart()
+        self.chart.setAnimationOptions(QChart.NoAnimation)  # critical for 10 Hz updates
+        self.chart.legend().setVisible(False)
+        self.chart.setBackgroundBrush(QBrush(bg_color))
+        self.chart.setBackgroundPen(QPen(bg_color))
+        self.chart.setPlotAreaBackgroundBrush(QBrush(bg_color))
+        self.chart.setPlotAreaBackgroundVisible(True)
+        self.chart.setTitle("DuckDB Memory Usage")
+        self.chart.setTitleBrush(QBrush(text_color))
+        self.chart.setMargins(self.chart.margins())
 
-        layout.addWidget(self.canvas)
+        # Upper line follows the history; lower line is held flat at y=0 so the
+        # area series fills from the curve down to the X axis.
+        self.upper_series = QLineSeries()
+        self.upper_series.append(0.0, 0.0)
+
+        self.lower_series = QLineSeries()
+        self.lower_series.append(0.0, 0.0)
+        self.lower_series.append(float(self.max_history_points - 1), 0.0)
+
+        self.area_series = QAreaSeries(self.upper_series, self.lower_series)
+        # QAreaSeries does not take ownership of its line series in C++ Qt; reparent
+        # to the area so they outlive this function's local references.
+        self.upper_series.setParent(self.area_series)
+        self.lower_series.setParent(self.area_series)
+
+        fill_color = QColor(accent_color)
+        fill_color.setAlphaF(0.30)
+        self.area_series.setBrush(QBrush(fill_color))
+        line_pen = QPen(accent_color)
+        line_pen.setWidth(2)
+        self.area_series.setPen(line_pen)
+
+        self.chart.addSeries(self.area_series)
+
+        # X axis: hidden — the horizontal position is just polling order.
+        self.axis_x = QValueAxis()
+        self.axis_x.setRange(0, self.max_history_points - 1)
+        self.axis_x.setVisible(False)
+
+        # Y axis: dynamic range based on peak * 1.1, palette-styled.
+        self.axis_y = QValueAxis()
+        self.axis_y.setRange(0, 1.0)
+        self.axis_y.setTitleText("Total DuckDB Memory (MB)")
+        self.axis_y.setTitleBrush(QBrush(text_color))
+        self.axis_y.setLabelsColor(text_color)
+        self.axis_y.setGridLinePen(QPen(grid_color))
+        axis_line_pen = QPen(text_color)
+        axis_line_pen.setWidthF(0.8)
+        self.axis_y.setLinePen(axis_line_pen)
+        self.axis_y.applyNiceNumbers()
+
+        self.chart.addAxis(self.axis_x, Qt.AlignBottom)
+        self.chart.addAxis(self.axis_y, Qt.AlignLeft)
+        self.area_series.attachAxis(self.axis_x)
+        self.area_series.attachAxis(self.axis_y)
+
+        self.chart_view = QChartView(self.chart)
+        self.chart_view.setRenderHint(QPainter.Antialiasing, True)
+
+        layout.addWidget(self.chart_view)
         self.tabs.addTab(tab, "Live Graph")
 
     def refresh_stats(self) -> None:
@@ -127,44 +178,25 @@ class DuckDBProfilerDialog(QDialog):
             self.tree.addTopLevelItem(QTreeWidgetItem(["Error fetching stats", str(e), ""]))
 
     def _update_graph(self) -> None:
-        """Redraw the memory usage graph with current history data."""
-        self.ax.clear()
+        """Push the current history into the line/area series and rescale Y."""
+        n = len(self.mem_history)
+        if n == 0:
+            return
 
-        # Apply theme aesthetics
-        self.ax.tick_params(colors=self.text_color)
-        for spine in self.ax.spines.values():
-            spine.set_color(self.text_color)
-        self.ax.spines["top"].set_visible(False)
-        self.ax.spines["right"].set_visible(False)
+        upper_points = [QPointF(float(i), float(v)) for i, v in enumerate(self.mem_history)]
+        self.upper_series.replace(upper_points)
 
-        self.ax.set_ylabel("Total DuckDB Memory (MB)", color=self.text_color)
-        self.ax.set_title("DuckDB Memory Usage", color=self.text_color)
+        # Hold the lower line flat at y=0 across the same X range as the upper line.
+        right_x = float(max(n - 1, 1))
+        self.lower_series.replace([QPointF(0.0, 0.0), QPointF(right_x, 0.0)])
 
-        # Grab the current theme's primary highlight/accent color
-        accent_color = self.palette().color(QPalette.Highlight).name()
-
-        # Plot the data (Task Manager style with a filled area under the curve)
-        x_data = list(range(len(self.mem_history)))
-        self.ax.plot(x_data, self.mem_history, color=accent_color, linewidth=2)
-        self.ax.fill_between(x_data, self.mem_history, color=accent_color, alpha=0.3)
-
-        # Keep the X axis fixed to our max history size so it scrolls right-to-left
-        self.ax.set_xlim(0, self.max_history_points - 1)
-
-        if self.mem_history:
-            peak_value = max(self.mem_history)
-            upper_bound = max(1.0, peak_value * 1.1)
-            self.ax.set_ylim(0, upper_bound)
-
-        # Hide X-axis ticks as they just represent generic polling intervals
-        self.ax.set_xticks([])
-
-        self.figure.tight_layout()
-        self.canvas.draw_idle()
+        peak_value = max(self.mem_history)
+        upper_bound = max(1.0, peak_value * 1.1)
+        self.axis_y.setRange(0, upper_bound)
 
     def closeEvent(self, event: object) -> None:
         """Clean up timer on dialog close.
-        
+
         Args:
             event: The close event.
         """

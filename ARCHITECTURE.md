@@ -185,7 +185,7 @@ Results → UI Updates (via Qt Signals)
 
 #### Dialogs (Popups)
 - **`dialogs/find.py`**: Find, Find/Replace, Go-to-Line
-- **`dialogs/visualize.py`**: Matplotlib chart builder
+- **`dialogs/visualize.py`**: QtCharts chart builder with DuckDB-backed aggregation (Bar, Stacked Bar, Line, Area, Stacked Area, Scatter, Pie, Donut, Heatmap, Pivot Table)
 - **`dialogs/settings.py`**: User preferences dialog
 - **`dialogs/db_connection_dialog.py`**: Database connection type chooser
 - **`dialogs/file_connection_dialog.py`**: File-system connection type chooser
@@ -337,7 +337,7 @@ self.query_panel.run_query_requested.connect(
 ### 5. Data Export & Visualization
 
 - **Export:** [flatsql/core/exporter.py](flatsql/core/exporter.py) uses Polars for high-speed multi-format export
-- **Visualization:** Matplotlib with `QtAgg` backend for in-app charts
+- **Visualization:** PySide6-QtCharts (native, no extra dependencies) for in-app charts; aggregations run on a background thread against a DuckDB connection that has the result `pl.DataFrame` registered as a view, then small grouped results are pushed into the chart series.
 - **Profiling:** Column stats (null %, unique count, distribution) rendered as cards
 
 ---
