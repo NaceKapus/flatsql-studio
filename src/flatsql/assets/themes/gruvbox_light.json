@@ -93,6 +93,9 @@
         "QFrame#queryEmptyStateCard": {
             "border-color": "#928374"
         },
+        "QListWidget#dropZoneList": {
+            "border-color": "#928374"
+        },
         "QTabBar::tab:selected": {
             "border-top": "2px solid #076678"
         },
