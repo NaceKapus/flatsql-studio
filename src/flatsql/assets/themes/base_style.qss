@@ -317,8 +317,18 @@ QListWidget#dropZoneList {
     background: transparent;
 }
 
+QListWidget#dropZoneList[chipMode="true"] {
+    border: 1px dashed palette(mid);
+    border-radius: 6px;
+    padding: 2px;
+}
+
 QListWidget#dropZoneList[dragOver="true"] {
     border: 2px solid palette(highlight);
+}
+
+QFrame#chartToolbar {
+    background: transparent;
 }
 
 QListWidget#dropZoneList::item {
