@@ -752,6 +752,13 @@ class TestUiScalingRegressions:
         app = QApplication.instance() or QApplication([])
         assert app is not None
 
+        # The offscreen QPA platform (used in CI) has no window manager to size a
+        # shown window up to its sizeHint, so width() can be narrower than the
+        # hint even when the dialog renders correctly on a real display. This
+        # regression guard is only meaningful with a real windowing system.
+        if app.platformName() == "offscreen":
+            pytest.skip("window geometry is not enforced under the offscreen QPA platform")
+
         from flatsql.core.sql_generator import SQLGenerator
         from flatsql.ui.dialogs.settings import SettingsDialog
 
