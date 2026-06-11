@@ -1,0 +1,4 @@
+# Development / test dependencies. Pulls in the runtime deps too,
+# so `pip install -r requirements-dev.txt` is a full dev setup.
+-r requirements.txt
+pytest>=8.0

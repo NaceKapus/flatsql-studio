@@ -429,10 +429,15 @@ class TestHistoryManager:
     def history(self, tmp_path: Path):
         """Provide a HistoryManager backed by a temporary DuckDB file."""
         db_file = tmp_path / "userdata.duckdb"
-        settings_file = tmp_path / "settings.json"
-        with patch("flatsql.core.history.SETTINGS_PATH", str(settings_file)):
+        # HistoryManager reads HISTORY_DB_PATH at construction; point it at the
+        # temp file so the real user-data history DB is never touched.
+        with patch("flatsql.core.history.HISTORY_DB_PATH", str(db_file)):
             from flatsql.core.history import HistoryManager
-            yield HistoryManager()
+            manager = HistoryManager()
+            try:
+                yield manager
+            finally:
+                manager.con.close()
 
     def test_empty_on_init(self, history) -> None:
         assert history.get_recent_history(limit=10) == []

@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pip install -r requirements.txt                              # install dependencies
+pip install -r requirements.txt                              # install runtime dependencies
+pip install -r requirements-dev.txt                          # + test deps (pytest), for local pytest runs
 python run.py                                                 # run the desktop app
 
 pytest                                                        # run all tests
@@ -13,7 +14,11 @@ pytest tests/test_core.py::TestSQLGeneratorMerge              # run a single tes
 pytest tests/test_core.py::TestSQLGeneratorMerge -k merge     # filter by name within a class
 ```
 
-There is no Python linter wired into the repo — PEP 8 is enforced by convention. SQL files are formatted with SQLFluff; see [.sqlfluff](.sqlfluff). Release binaries are built by [.github/workflows/release.yml](.github/workflows/release.yml) on tag push (`v*`); local PyInstaller invocation is not part of the dev loop.
+There is no Python linter wired into the repo — PEP 8 is enforced by convention. SQL files are formatted with SQLFluff; see [.sqlfluff](.sqlfluff).
+
+**Testing / CI.** The test suite runs in CI as part of the release build ([.github/workflows/release.yml](.github/workflows/release.yml)) on tag push (`v*`): `pytest` runs first and gates the release — a failing test aborts the build before any binary is produced. There is **no** per-PR test workflow, by design. Because CI covers tests at build time, **do not run `pytest` proactively after routine edits — run it locally only when the user explicitly asks.**
+
+Release binaries are built by [.github/workflows/release.yml](.github/workflows/release.yml) on tag push (`v*`); local PyInstaller invocation is not part of the dev loop.
 
 ## Architecture
 
