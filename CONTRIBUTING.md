@@ -22,9 +22,10 @@ Run the application:
 python run.py
 ```
 
-Run tests:
+Run tests (installs the runtime deps plus pytest):
 
 ```bash
+pip install -r requirements-dev.txt
 pytest
 ```
 

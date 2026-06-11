@@ -30,7 +30,8 @@ class SqlHighlighter(QSyntaxHighlighter):
                 "string": "#CE9178",
                 "keyword": "#569CD6",
                 "function": "#C586C0",
-                "comment": "#6A9955"
+                "comment": "#6A9955",
+                "number": "#B5CEA8"
             }
 
         # --- Helper to Create Formats ---
@@ -47,17 +48,29 @@ class SqlHighlighter(QSyntaxHighlighter):
         self.single_line_comment_format = create_format(theme_colors.get('comment', "#6A9955"))
         self.multi_line_comment_format = create_format(theme_colors.get('comment', "#6A9955"))
         self.function_format = create_format(theme_colors.get('function', "#C586C0"))
+        self.number_format = create_format(theme_colors.get('number', "#B5CEA8"))
         keyword_format = create_format(theme_colors.get('keyword', "#569CD6"))
 
         # --- Create Highlighting Rules in Order of Precedence ---
         self.highlighting_rules = []
 
         # 1. High-precedence rules for elements that should never be overridden.
-        self.highlighting_rules.append((QRegularExpression(r'"[^"]*"'), self.quoted_identifier_format))
-        self.highlighting_rules.append((QRegularExpression(r"'[^']*'"), self.string_format))
+        # Dollar-quoted strings come first; the back-reference forces the closing
+        # tag to match the opening one ($$...$$ or $tag$...$tag$). Single-line only.
+        self.highlighting_rules.append((QRegularExpression(r'\$(\w*)\$.*?\$\1\$'), self.string_format))
+        # Quoted identifiers and strings allow doubled quotes as escapes,
+        # mirroring DuckDB's own identifier grammar (see FlatEngine).
+        self.highlighting_rules.append((QRegularExpression(r'"(?:[^"]|"")*"'), self.quoted_identifier_format))
+        self.highlighting_rules.append((QRegularExpression(r"'(?:[^']|'')*'"), self.string_format))
         self.highlighting_rules.append((QRegularExpression(r'--[^\n]*'), self.single_line_comment_format))
 
-        # 2. Functions Rule (Applied BEFORE keywords).
+        # 2. Numeric literals (integers, decimals, scientific notation). The
+        # look-behind keeps digits inside identifiers (col1, t1.col) untouched.
+        self.highlighting_rules.append(
+            (QRegularExpression(r'(?<![\w.])(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?'), self.number_format)
+        )
+
+        # 3. Functions Rule (Applied BEFORE keywords).
         # This ensures that if a name is both a keyword and a function (e.g., "LEFT"),
         # it's correctly identified as a function when followed by '('.
         if functions:
