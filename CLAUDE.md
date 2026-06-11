@@ -16,7 +16,7 @@ pytest tests/test_core.py::TestSQLGeneratorMerge -k merge     # filter by name w
 
 There is no Python linter wired into the repo — PEP 8 is enforced by convention. SQL files are formatted with SQLFluff; see [.sqlfluff](.sqlfluff).
 
-**Testing / CI.** The test suite runs in CI as part of the release build ([.github/workflows/release.yml](.github/workflows/release.yml)) on tag push (`v*`): `pytest` runs first and gates the release — a failing test aborts the build before any binary is produced. There is **no** per-PR test workflow, by design. Because CI covers tests at build time, **do not run `pytest` proactively after routine edits — run it locally only when the user explicitly asks.**
+**Testing / CI.** The test suite runs in CI on every push to `main` and every pull request ([.github/workflows/ci.yml](.github/workflows/ci.yml)) across **macOS and Windows** — get that run green before tagging. The release build ([.github/workflows/release.yml](.github/workflows/release.yml)) deliberately does **not** run tests, so tagging never fails on tests (and never forces a re-tag). The flip side: a tag can ship even if tests would fail, so confirm the CI run on `main` is green before you tag. Because CI covers tests, **do not run `pytest` proactively after routine edits — run it locally only when the user explicitly asks.** Note that some failures are platform-specific (e.g. SQLFluff config discovery on macOS), so local runs — even `QT_QPA_PLATFORM=offscreen pytest` — can't substitute for CI's cross-platform check.
 
 Release binaries are built by [.github/workflows/release.yml](.github/workflows/release.yml) on tag push (`v*`); local PyInstaller invocation is not part of the dev loop.
 

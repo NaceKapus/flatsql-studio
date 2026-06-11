@@ -1189,25 +1189,29 @@ class TestRenderSqlfluffConfig:
             == "True"
         )
 
-    def test_loadable_by_sqlfluff(self) -> None:
+    def test_loadable_by_sqlfluff(self, tmp_path: Path) -> None:
         """The rendered config must be readable by SQLFluff itself."""
         from sqlfluff.core import FluffConfig
 
         from flatsql.core.settings import DEFAULT_SETTINGS
         from flatsql.core.sqlfluff_config import render_sqlfluff_config
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".cfg", delete=False, encoding="utf-8"
-        ) as f:
-            f.write(render_sqlfluff_config(DEFAULT_SETTINGS))
-            cfg_path = f.name
+        # SQLFluff only auto-discovers configs with recognised names
+        # (.sqlfluff, setup.cfg, ...), so write the rendered INI as a real
+        # `.sqlfluff` file and load its directory. A randomly-named temp file is
+        # silently ignored on macOS, which newer SQLFluff then rejects for
+        # having no dialect — so this is the load path that actually exercises
+        # the file across platforms.
+        cfg_dir = tmp_path / "fluff"
+        cfg_dir.mkdir()
+        (cfg_dir / ".sqlfluff").write_text(
+            render_sqlfluff_config(DEFAULT_SETTINGS), encoding="utf-8"
+        )
 
-        try:
-            # If the INI is malformed or uses non-existent sections/keys,
-            # this raises before we can verify any rule is active.
-            FluffConfig.from_path(cfg_path)
-        finally:
-            os.unlink(cfg_path)
+        # Raises if the INI is malformed, uses unknown sections/keys, or omits
+        # the dialect — so this asserts the rendered config is self-sufficient.
+        config = FluffConfig.from_path(str(cfg_dir))
+        assert config.get("dialect") == "duckdb"
 
 
 class TestWriteUserSqlfluffConfig:
